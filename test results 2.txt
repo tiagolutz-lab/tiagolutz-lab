@@ -1,0 +1,55 @@
+PL/SQL procedure successfully completed.
+
+
+── Test 1: NULL frequency (should always be due) ──────────────────────
+Next fire : 12-OCT-2026 13:16:46
+SYSDATE   : 13-OCT-2026 13:16:46
+Due now?  : YES — OK
+
+
+PL/SQL procedure successfully completed.
+
+
+── Test 2: 50s interval, anchor = 43s ago (should NOT be due yet) ─────
+Uses anchor as start_date — next fire should be anchor+50s
+Anchor    : 13-OCT-2026 13:16:03
+Next fire : 13-OCT-2026 13:16:40
+Expected  : 13-OCT-2026 13:16:53
+SYSDATE   : 13-OCT-2026 13:16:46
+Due now?  : YES — BUG (should be NO)
+
+
+PL/SQL procedure successfully completed.
+
+
+── Test 3: 50s interval, anchor = 55s ago (should be due) ─────────────
+Anchor    : 13-OCT-2026 13:15:52
+Next fire : 13-OCT-2026 13:16:40
+Expected  : 13-OCT-2026 13:16:42
+SYSDATE   : 13-OCT-2026 13:16:47
+Due now?  : YES — OK
+
+
+PL/SQL procedure successfully completed.
+
+
+── Test 4: NULL last_dispatched_date, first-ever run (should be due) ───
+Next fire : 12-OCT-2025 13:17:30
+SYSDATE   : 13-OCT-2026 13:16:47
+Due now?  : YES — OK
+
+
+PL/SQL procedure successfully completed.
+
+
+── Test 5: Raw EVALUATE_CALENDAR_STRING using anchor as start_date ─────
+This is what the fixed function will do internally.
+next fire should be exactly anchor+50s, NOT be due yet at anchor+43s.
+Anchor      : 13-OCT-2026 13:16:04 +00:00
+Next fire   : 13-OCT-2026 13:16:54 +00:00
+Expected    : 13-OCT-2026 13:16:54 +00:00
+SYSTIMESTAMP: 13-OCT-2026 13:16:47 +00:00
+Due now?    : NO — OK
+
+
+PL/SQL procedure successfully completed.
