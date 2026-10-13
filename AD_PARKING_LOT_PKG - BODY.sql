@@ -1202,6 +1202,15 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
     --   Part B2 ATP_GROUP SERIAL — single MERGE with inline analytics.
     --     Minimum eligible sequence per interface derived set-based.
     --     No row-by-row loop.
+    --
+    -- Cross-interface dependency gate (AD_INT_DEPENDENCIES):
+    --   All three parts share a blocked_keys CTE that identifies
+    --   (INTERFACE_ID, STAGE_NUMBER, BUSINESS_IDENTIFIER1) combinations
+    --   whose prerequisite interface still has non-terminal messages
+    --   (STATUS NOT IN ('COMPLETED','FAILED')).  Candidates matching a
+    --   blocked key are excluded from promotion and remain QUEUED/RETRY
+    --   until the prerequisite drains.  Only active dependency rules
+    --   (STATUS = 'A') are evaluated.
     -- =========================================================================
     PROCEDURE SEQUENCE_MSGS
     IS
@@ -1215,15 +1224,18 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         -- Rule: promote a QUEUED/RETRY row to READY_TO_DISPATCH only when
         -- no row with a lower MSG_ID exists for the same
         -- (INTERFACE_ID, BUSINESS_IDENTIFIER1) in PROCESSING or
-        -- READY_TO_DISPATCH status.
+        -- READY_TO_DISPATCH status, AND the cross-interface dependency
+        -- gate (AD_INT_DEPENDENCIES) is satisfied for this business key.
         --
         -- Implementation: two small scans joined — avoids scanning the large
         -- READY_TO_DISPATCH set together with QUEUED/RETRY candidates:
         --   1. active_mins: aggregate MIN(MSG_ID) per key over PROCESSING +
         --      READY_TO_DISPATCH only — small GROUP BY, no window function
         --   2. candidates: QUEUED/RETRY rows joined to AD_INT_MASTER — small
-        --   3. LEFT JOIN active_mins: eligible when no active min exists (NULL)
-        --      or candidate MSG_ID < min active MSG_ID for its key
+        --   3. blocked_keys: (INTERFACE_ID, STAGE_NUMBER, BUSINESS_IDENTIFIER1)
+        --      tuples whose prerequisite interface still has open messages
+        --   4. LEFT JOIN active_mins: eligible when no active row has lower MSG_ID
+        --      AND the key is not present in blocked_keys
         --
         -- No WAITING_TIME check. No MSG_SEQUENCE blocking. No ROW_NUMBER dedup.
         -- DB_JOB_ID not used.
@@ -1249,6 +1261,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 SELECT a.ROWID  AS row_id,
                        a.MSG_ID,
                        a.INTERFACE_ID,
+                       a.STAGE_NUMBER,
                        a.BUSINESS_IDENTIFIER1
                   FROM AD_MSG_AUDIT  a
                   JOIN AD_INT_MASTER m
@@ -1258,15 +1271,36 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                    AND  m.INTERFACE_CATEGORY IN ('Processor', 'PostProcessor')
                    AND  m.STATUS             = 'A'
                  WHERE a.STATUS IN ('QUEUED', 'RETRY')
+            ),
+            -- Step 3: blocked keys — prerequisite interface has non-terminal messages
+            -- for the same BUSINESS_IDENTIFIER1.  Only active dependency rules.
+            blocked_keys AS
+            (
+                SELECT DISTINCT
+                       d.INTERFACE_ID,
+                       d.STAGE_NUMBER,
+                       prereq.BUSINESS_IDENTIFIER1
+                  FROM AD_INT_DEPENDENCIES d
+                  JOIN AD_MSG_AUDIT        prereq
+                    ON  prereq.INTERFACE_ID  = d.DEPENDS_ON_INTERFACE_ID
+                   AND  prereq.STAGE_NUMBER  = d.DEPENDS_ON_STAGE_NUMBER
+                   AND  prereq.STATUS       NOT IN ('COMPLETED', 'FAILED')
+                 WHERE d.STATUS = 'A'
             )
-            -- Step 3: left join — eligible when no active row has lower MSG_ID
+            -- Step 4: left join — eligible when no active row has lower MSG_ID
+            --         AND this (interface, stage, business key) is not blocked
             SELECT c.row_id
               FROM candidates       c
               LEFT JOIN active_mins a
-                ON  a.INTERFACE_ID       = c.INTERFACE_ID
+                ON  a.INTERFACE_ID        = c.INTERFACE_ID
                AND  a.BUSINESS_IDENTIFIER1 = c.BUSINESS_IDENTIFIER1
-             WHERE a.min_msg_id IS NULL        -- no active row for this key
-                OR c.MSG_ID < a.min_msg_id     -- candidate is lower than any active
+              LEFT JOIN blocked_keys      bk
+                ON  bk.INTERFACE_ID        = c.INTERFACE_ID
+               AND  bk.STAGE_NUMBER        = c.STAGE_NUMBER
+               AND  bk.BUSINESS_IDENTIFIER1 = c.BUSINESS_IDENTIFIER1
+             WHERE bk.INTERFACE_ID IS NULL          -- dependency gate: not blocked
+               AND (   a.min_msg_id IS NULL         -- no active row for this key
+                    OR c.MSG_ID < a.min_msg_id)     -- candidate is lower than any active
         ) src
         ON (tgt.ROWID = src.row_id)
         WHEN MATCHED THEN
@@ -1277,11 +1311,26 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         -- PART B1: ATP_GROUP PARALLEL — single MERGE, inline JOIN
         -- Replaces correlated EXISTS with a join inside the USING clause.
         -- One pass over AD_MSG_AUDIT for QUEUED/RETRY group rows.
+        -- Dependency gate: blocked_keys CTE excludes rows whose prerequisite
+        -- interface still has non-terminal messages for the same business key.
         -- ══════════════════════════════════════════════════════════════════════
         MERGE /*+ enable_parallel_dml parallel(4) */
          INTO AD_MSG_AUDIT tgt
         USING
         (
+            WITH blocked_keys AS
+            (
+                SELECT DISTINCT
+                       d.INTERFACE_ID,
+                       d.STAGE_NUMBER,
+                       prereq.BUSINESS_IDENTIFIER1
+                  FROM AD_INT_DEPENDENCIES d
+                  JOIN AD_MSG_AUDIT        prereq
+                    ON  prereq.INTERFACE_ID  = d.DEPENDS_ON_INTERFACE_ID
+                   AND  prereq.STAGE_NUMBER  = d.DEPENDS_ON_STAGE_NUMBER
+                   AND  prereq.STATUS       NOT IN ('COMPLETED', 'FAILED')
+                 WHERE d.STATUS = 'A'
+            )
             SELECT a.ROWID AS row_id
               FROM AD_MSG_AUDIT  a
               JOIN AD_INT_MASTER m
@@ -1294,7 +1343,12 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                AND  (m.WAITING_TIME = 0 OR
                      TRUNC((SYSDATE - a.LAST_UPDATE_DATE) * 24 * 60 * 60)
                      >= m.WAITING_TIME)
+              LEFT JOIN blocked_keys bk
+                ON  bk.INTERFACE_ID         = a.INTERFACE_ID
+               AND  bk.STAGE_NUMBER         = a.STAGE_NUMBER
+               AND  bk.BUSINESS_IDENTIFIER1 = a.BUSINESS_IDENTIFIER1
              WHERE a.STATUS IN ('QUEUED', 'RETRY')
+               AND bk.INTERFACE_ID IS NULL   -- dependency gate: not blocked
         ) src
         ON (tgt.ROWID = src.row_id)
         WHEN MATCHED THEN
@@ -1306,11 +1360,26 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         -- Minimum eligible sequence per (INTERFACE_ID, STAGE_NUMBER) computed
         -- inline. PARENT_MSG_SEQUENCE used when present, MSG_SEQUENCE otherwise.
         -- Blocking considers all statuses (QUEUED, RETRY, PROCESSING).
+        -- Dependency gate: blocked_keys CTE excludes rows whose prerequisite
+        -- interface still has non-terminal messages for the same business key.
         -- ══════════════════════════════════════════════════════════════════════
         MERGE /*+ enable_parallel_dml parallel(4) */
          INTO AD_MSG_AUDIT tgt
         USING
         (
+            WITH blocked_keys AS
+            (
+                SELECT DISTINCT
+                       d.INTERFACE_ID,
+                       d.STAGE_NUMBER,
+                       prereq.BUSINESS_IDENTIFIER1
+                  FROM AD_INT_DEPENDENCIES d
+                  JOIN AD_MSG_AUDIT        prereq
+                    ON  prereq.INTERFACE_ID  = d.DEPENDS_ON_INTERFACE_ID
+                   AND  prereq.STAGE_NUMBER  = d.DEPENDS_ON_STAGE_NUMBER
+                   AND  prereq.STATUS       NOT IN ('COMPLETED', 'FAILED')
+                 WHERE d.STATUS = 'A'
+            )
             SELECT a.ROWID AS row_id
               FROM AD_MSG_AUDIT  a
               JOIN AD_INT_MASTER m
@@ -1369,6 +1438,11 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                          AND a.PARENT_MSG_SEQUENCE IS NULL
                          AND a.MSG_SEQUENCE = mins.min_seq)
                     )
+              LEFT JOIN blocked_keys bk
+                ON  bk.INTERFACE_ID         = a.INTERFACE_ID
+               AND  bk.STAGE_NUMBER         = a.STAGE_NUMBER
+               AND  bk.BUSINESS_IDENTIFIER1 = a.BUSINESS_IDENTIFIER1
+             WHERE bk.INTERFACE_ID IS NULL   -- dependency gate: not blocked
         ) src
         ON (tgt.ROWID = src.row_id)
         WHEN MATCHED THEN
