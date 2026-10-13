@@ -123,3 +123,29 @@ OIC_DISPATCHER_INTEGRATION_CODE = 'N/A', OIC_DISPATCHER_INSTANCE_NAME = 'N/A'
 COMMIT
 /
 
+
+-- =============================================================================
+-- Dispatch frequency columns
+--
+-- DISPATCH_FREQUENCY   — pipe-separated DBMS_SCHEDULER calendar expressions.
+--                        NULL = no frequency gate (existing behaviour preserved).
+--                        Example: 'FREQ=DAILY;BYHOUR=2,16;BYMINUTE=0;BYSECOND=0'
+--                        See DDL_F_NEXT_DISPATCH_DATE.sql for all examples.
+--
+-- LAST_DISPATCHED_DATE — set by AD_PARKING_LOT_PKG.DISPATCH after each run.
+--                        Used as the anchor for F_NEXT_DISPATCH_DATE so the
+--                        next evaluation window advances past the last dispatch.
+-- =============================================================================
+
+ALTER TABLE AD_INT_MASTER ADD DISPATCH_FREQUENCY   VARCHAR2(4000) DEFAULT NULL
+/
+ALTER TABLE AD_INT_MASTER ADD LAST_DISPATCHED_DATE DATE           DEFAULT NULL
+/
+
+COMMENT ON COLUMN AD_INT_MASTER.DISPATCH_FREQUENCY IS
+    'Pipe-separated DBMS_SCHEDULER calendar expression(s). NULL = no frequency gate. Example: FREQ=DAILY;BYHOUR=2,16;BYMINUTE=0;BYSECOND=0'
+/
+COMMENT ON COLUMN AD_INT_MASTER.LAST_DISPATCHED_DATE IS
+    'Last time DISPATCH promoted messages for this interface. Set automatically by AD_PARKING_LOT_PKG.DISPATCH. Used as anchor for F_NEXT_DISPATCH_DATE.'
+/
+
