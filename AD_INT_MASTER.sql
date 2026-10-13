@@ -187,10 +187,10 @@ COMMENT ON COLUMN AD_INT_MASTER.LAST_DISPATCHED_DATE IS
 --
 -- =============================================================================
 
-ALTER TABLE AD_INT_MASTER ADD INDIVIDUAL_BATCH_SIZE NUMBER DEFAULT 1
+ALTER TABLE AD_INT_MASTER ADD INDIVIDUAL_BATCH_SIZE NUMBER DEFAULT NULL
 /
 
 COMMENT ON COLUMN AD_INT_MASTER.INDIVIDUAL_BATCH_SIZE IS
-    'ATP_INDIVIDUAL only. Max number of messages per OIC invocation. OIC always receives a JSON array. NULL or 1 = one message per call (default).'
+    'ATP_INDIVIDUAL only. Max number of messages per OIC invocation. OIC always receives a JSON array. NULL or 1 = one message per call (treated as 1 internally by the package).'
 /
 
