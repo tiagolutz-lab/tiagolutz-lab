@@ -129,12 +129,37 @@ COMMIT
 --
 -- DISPATCH_FREQUENCY   — pipe-separated DBMS_SCHEDULER calendar expressions.
 --                        NULL = no frequency gate (existing behaviour preserved).
---                        Example: 'FREQ=DAILY;BYHOUR=2,16;BYMINUTE=0;BYSECOND=0'
---                        See DDL_F_NEXT_DISPATCH_DATE.sql for all examples.
+--                        Multiple expressions are OR-ed: the interface is due
+--                        as soon as ANY expression fires.
 --
 -- LAST_DISPATCHED_DATE — set by AD_PARKING_LOT_PKG.DISPATCH after each run.
 --                        Used as the anchor for F_NEXT_DISPATCH_DATE so the
 --                        next evaluation window advances past the last dispatch.
+--
+-- ── DISPATCH_FREQUENCY examples ──────────────────────────────────────────────
+--
+--   NULL (no gate — always due, existing behaviour):
+--     NULL
+--
+--   Every 30 seconds:
+--     'FREQ=SECONDLY;INTERVAL=30'
+--
+--   Every 5 minutes:
+--     'FREQ=MINUTELY;INTERVAL=5'
+--
+--   Every 4 hours:
+--     'FREQ=HOURLY;INTERVAL=4'
+--
+--   Daily at 2 AM and 4 PM:
+--     'FREQ=DAILY;BYHOUR=2,16;BYMINUTE=0;BYSECOND=0'
+--
+--   1st of every month at 1 AM and 5 AM (two expressions, pipe-separated):
+--     'FREQ=MONTHLY;BYMONTHDAY=1;BYHOUR=1;BYMINUTE=0;BYSECOND=0|FREQ=MONTHLY;BYMONTHDAY=1;BYHOUR=5;BYMINUTE=0;BYSECOND=0'
+--
+--   1st of month at 1 AM & 5 AM, AND 5th of month at 1 AM & 5 PM
+--   (four expressions OR-ed):
+--     'FREQ=MONTHLY;BYMONTHDAY=1;BYHOUR=1;BYMINUTE=0;BYSECOND=0|FREQ=MONTHLY;BYMONTHDAY=1;BYHOUR=5;BYMINUTE=0;BYSECOND=0|FREQ=MONTHLY;BYMONTHDAY=5;BYHOUR=1;BYMINUTE=0;BYSECOND=0|FREQ=MONTHLY;BYMONTHDAY=5;BYHOUR=17;BYMINUTE=0;BYSECOND=0'
+--
 -- =============================================================================
 
 ALTER TABLE AD_INT_MASTER ADD DISPATCH_FREQUENCY   VARCHAR2(4000) DEFAULT NULL
@@ -143,7 +168,7 @@ ALTER TABLE AD_INT_MASTER ADD LAST_DISPATCHED_DATE DATE           DEFAULT NULL
 /
 
 COMMENT ON COLUMN AD_INT_MASTER.DISPATCH_FREQUENCY IS
-    'Pipe-separated DBMS_SCHEDULER calendar expression(s). NULL = no frequency gate. Example: FREQ=DAILY;BYHOUR=2,16;BYMINUTE=0;BYSECOND=0'
+    'Pipe-separated DBMS_SCHEDULER calendar expression(s). NULL = no frequency gate. OR logic: due if any expression fires. Example: FREQ=DAILY;BYHOUR=2,16;BYMINUTE=0;BYSECOND=0'
 /
 COMMENT ON COLUMN AD_INT_MASTER.LAST_DISPATCHED_DATE IS
     'Last time DISPATCH promoted messages for this interface. Set automatically by AD_PARKING_LOT_PKG.DISPATCH. Used as anchor for F_NEXT_DISPATCH_DATE.'
