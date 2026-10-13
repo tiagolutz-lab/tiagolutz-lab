@@ -1587,6 +1587,8 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                AND m.STATUS         = 'A'
                AND m.OUTAGE         = 'N'
                AND m.DISPATCH_TYPE  IN ('ATP_INDIVIDUAL', 'ATP_GROUP')
+               AND (   m.DISPATCH_FREQUENCY IS NULL
+                    OR F_NEXT_DISPATCH_DATE(m.DISPATCH_FREQUENCY, m.LAST_DISPATCHED_DATE) <= SYSDATE)
              ORDER BY m.PRIORITY, m.INTERFACE_ID, m.STAGE_NUMBER
         )
         LOOP
