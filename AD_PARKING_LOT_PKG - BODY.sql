@@ -1207,7 +1207,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
     --   All three parts share a blocked_keys CTE that identifies
     --   (INTERFACE_ID, STAGE_NUMBER, BUSINESS_IDENTIFIER1) combinations
     --   whose prerequisite interface still has non-terminal messages
-    --   (STATUS NOT IN ('COMPLETED','FAILED')).  Candidates matching a
+    --   (STATUS NOT IN ('PROCESSED','ERROR')).  Candidates matching a
     --   blocked key are excluded from promotion and remain QUEUED/RETRY
     --   until the prerequisite drains.  Only active dependency rules
     --   (STATUS = 'A') are evaluated.
@@ -1284,7 +1284,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                   JOIN AD_MSG_AUDIT        prereq
                     ON  prereq.INTERFACE_ID  = d.DEPENDS_ON_INTERFACE_ID
                    AND  prereq.STAGE_NUMBER  = d.DEPENDS_ON_STAGE_NUMBER
-                   AND  prereq.STATUS       NOT IN ('COMPLETED', 'FAILED')
+                   AND  prereq.STATUS       NOT IN ('PROCESSED', 'ERROR')
                  WHERE d.STATUS = 'A'
             )
             -- Step 4: left join — eligible when no active row has lower MSG_ID
@@ -1328,7 +1328,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                   JOIN AD_MSG_AUDIT        prereq
                     ON  prereq.INTERFACE_ID  = d.DEPENDS_ON_INTERFACE_ID
                    AND  prereq.STAGE_NUMBER  = d.DEPENDS_ON_STAGE_NUMBER
-                   AND  prereq.STATUS       NOT IN ('COMPLETED', 'FAILED')
+                   AND  prereq.STATUS       NOT IN ('PROCESSED', 'ERROR')
                  WHERE d.STATUS = 'A'
             )
             SELECT a.ROWID AS row_id
@@ -1377,7 +1377,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                   JOIN AD_MSG_AUDIT        prereq
                     ON  prereq.INTERFACE_ID  = d.DEPENDS_ON_INTERFACE_ID
                    AND  prereq.STAGE_NUMBER  = d.DEPENDS_ON_STAGE_NUMBER
-                   AND  prereq.STATUS       NOT IN ('COMPLETED', 'FAILED')
+                   AND  prereq.STATUS       NOT IN ('PROCESSED', 'ERROR')
                  WHERE d.STATUS = 'A'
             )
             SELECT a.ROWID AS row_id
