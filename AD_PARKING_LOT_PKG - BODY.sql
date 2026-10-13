@@ -1831,7 +1831,9 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
     -- =========================================================================
     -- DISPATCH_INDIVIDUAL_CHUNK  (public)
     -- Called by scheduler job for ATP_INDIVIDUAL.
-    -- Sends full message payload per message. HTTP 202 = success, row stays PROCESSING.
+    -- Sends messages as a JSON array to OIC. Array size is controlled by
+    -- AD_INT_MASTER.INDIVIDUAL_BATCH_SIZE (NULL treated as 1).
+    -- HTTP 202 = success, rows stay PROCESSING.
     -- OIC integration updates STATUS when done.
     -- =========================================================================
     PROCEDURE DISPATCH_INDIVIDUAL_CHUNK
@@ -1852,7 +1854,8 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             retry_count          AD_MSG_AUDIT.RETRY_COUNT%TYPE,
             max_retry_count      AD_INT_MASTER.MAX_RETRY_COUNT%TYPE,
             retry_enabled        AD_INT_MASTER.RETRY_ENABLED%TYPE,
-            oic_resource         AD_INT_MASTER.OIC_PROCESSOR_INTEGRATION_URI%TYPE
+            oic_resource         AD_INT_MASTER.OIC_PROCESSOR_INTEGRATION_URI%TYPE,
+            individual_batch_size AD_INT_MASTER.INDIVIDUAL_BATCH_SIZE%TYPE
         );
         TYPE t_msg_tab    IS TABLE OF t_msg_rec;
         TYPE t_error_tab  IS TABLE OF VARCHAR2(30000);
@@ -1869,6 +1872,11 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         l_bearer_token VARCHAR2(4000);
         l_body         CLOB;
         l_response     DBMS_CLOUD_TYPES.RESP;
+        l_batch_size   PLS_INTEGER;
+        l_batch_start  PLS_INTEGER;
+        l_batch_end    PLS_INTEGER;
+        l_batch_err    VARCHAR2(30000);
+        l_batch_status VARCHAR2(50);
 
     BEGIN
 
@@ -1906,7 +1914,8 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                a.RETRY_COUNT,
                m.MAX_RETRY_COUNT,
                m.RETRY_ENABLED,
-               m.OIC_PROCESSOR_INTEGRATION_URI
+               m.OIC_PROCESSOR_INTEGRATION_URI,
+               m.INDIVIDUAL_BATCH_SIZE
           BULK COLLECT INTO l_msgs
           FROM AD_MSG_AUDIT  a
           JOIN AD_INT_MASTER m
@@ -1925,26 +1934,50 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         l_statuses.EXTEND(l_msgs.COUNT);
         l_msg_ids .EXTEND(l_msgs.COUNT);
 
-        -- HTTP loop — zero SQL, all data from memory
+        -- Populate msg_ids array (needed for FORALL update at the end)
         FOR i IN 1 .. l_msgs.COUNT LOOP
             l_msg_ids(i) := l_msgs(i).msg_id;
+        END LOOP;
+
+        -- Batch size: NULL treated as 1 (one message per OIC call)
+        l_batch_size := NVL(l_msgs(1).individual_batch_size, 1);
+        IF l_batch_size < 1 THEN l_batch_size := 1; END IF;
+
+        -- HTTP loop — processes messages in batches of l_batch_size
+        -- Each batch is sent as a JSON array in a single OIC invocation.
+        -- All messages in a batch share the same success/failure outcome.
+        l_batch_start := 1;
+        WHILE l_batch_start <= l_msgs.COUNT LOOP
+
+            l_batch_end := LEAST(l_batch_start + l_batch_size - 1, l_msgs.COUNT);
+            l_batch_err    := NULL;
+            l_batch_status := NULL;
+
             BEGIN
-                l_body := JSON_OBJECT(
-                               'MsgId'               VALUE l_msgs(i).msg_id,
-                               'MsgObjectId'         VALUE l_msgs(i).msg_object_id,
-                               'InterfaceId'         VALUE l_msgs(i).interface_id,
-                               'BusinessIdentifier1' VALUE l_msgs(i).business_identifier1,
-                               'BusinessIdentifier2' VALUE l_msgs(i).business_identifier2,
-                               'BusinessIdentifier3' VALUE l_msgs(i).business_identifier3,
-                               'BusinessIdentifier4' VALUE l_msgs(i).business_identifier4,
-                               'BusinessIdentifier5' VALUE l_msgs(i).business_identifier5
-                           );
-                -- Use Bearer token if available, otherwise fall back to credential
+                -- Build JSON array for this batch
+                l_body := '[';
+                FOR i IN l_batch_start .. l_batch_end LOOP
+                    IF i > l_batch_start THEN
+                        l_body := l_body || ',';
+                    END IF;
+                    l_body := l_body || JSON_OBJECT(
+                                   'MsgId'               VALUE l_msgs(i).msg_id,
+                                   'MsgObjectId'         VALUE l_msgs(i).msg_object_id,
+                                   'InterfaceId'         VALUE l_msgs(i).interface_id,
+                                   'BusinessIdentifier1' VALUE l_msgs(i).business_identifier1,
+                                   'BusinessIdentifier2' VALUE l_msgs(i).business_identifier2,
+                                   'BusinessIdentifier3' VALUE l_msgs(i).business_identifier3,
+                                   'BusinessIdentifier4' VALUE l_msgs(i).business_identifier4,
+                                   'BusinessIdentifier5' VALUE l_msgs(i).business_identifier5
+                               );
+                END LOOP;
+                l_body := l_body || ']';
+
                 IF l_bearer_token IS NOT NULL THEN
                     l_response := DBMS_CLOUD.SEND_REQUEST
                     (
                         credential_name => NULL,
-                        uri             => l_base_url || l_msgs(i).oic_resource,
+                        uri             => l_base_url || l_msgs(l_batch_start).oic_resource,
                         method          => DBMS_CLOUD.METHOD_POST,
                         body            => UTL_RAW.CAST_TO_RAW(l_body),
                         headers         => JSON_OBJECT
@@ -1969,7 +2002,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                             l_response := DBMS_CLOUD.SEND_REQUEST
                             (
                                 credential_name => NULL,
-                                uri             => l_base_url || l_msgs(i).oic_resource,
+                                uri             => l_base_url || l_msgs(l_batch_start).oic_resource,
                                 method          => DBMS_CLOUD.METHOD_POST,
                                 body            => UTL_RAW.CAST_TO_RAW(l_body),
                                 headers         => JSON_OBJECT
@@ -1980,41 +2013,51 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                             );
                         END IF;
                     END IF;
+
+                    IF l_response.status_code = 202 THEN
+                        -- Success: leave rows as PROCESSING.
+                        -- OIC integration will update STATUS when processing completes.
+                        l_batch_err    := NULL;
+                        l_batch_status := NULL;
+                    ELSE
+                        l_batch_err    := 'HTTP ' || l_response.status_code
+                                          || ' for batch starting msgId=' || l_msgs(l_batch_start).msg_id;
+                        l_batch_status := NULL; -- resolved per-message below
+                    END IF;
                 ELSE
                     -- No Bearer token — cannot dispatch without OAuth
                     DBMS_OUTPUT.PUT_LINE
                     (
                         'DISPATCH_INDIVIDUAL_CHUNK: no Bearer token for env ['
-                        || l_env_id || '] — msg ' || l_msgs(i).msg_id || ' will ERROR'
+                        || l_env_id || '] — batch starting msg '
+                        || l_msgs(l_batch_start).msg_id || ' will ERROR'
                     );
-                    l_errors  (i) := 'No Bearer token available for env ' || l_env_id;
-                    l_statuses(i) := CASE
-                        WHEN l_msgs(i).retry_enabled = 'Y'
-                         AND l_msgs(i).retry_count   < l_msgs(i).max_retry_count
-                        THEN 'RETRY' ELSE 'ERROR' END;
+                    l_batch_err    := 'No Bearer token available for env ' || l_env_id;
+                    l_batch_status := NULL; -- resolved per-message below
                 END IF;
 
-                IF l_response.status_code = 202 THEN
-                    -- Success: leave row as PROCESSING.
-                    -- OIC integration will update STATUS when processing completes.
+            EXCEPTION
+                WHEN OTHERS THEN
+                    l_batch_err    := SUBSTR(SQLERRM, 1, 30000);
+                    l_batch_status := NULL;
+            END;
+
+            -- Propagate batch outcome to every message in the batch
+            FOR i IN l_batch_start .. l_batch_end LOOP
+                IF l_batch_err IS NULL THEN
                     l_errors  (i) := NULL;
                     l_statuses(i) := NULL;
                 ELSE
-                    l_errors  (i) := 'HTTP ' || l_response.status_code
-                                     || ' for msgId=' || l_msgs(i).msg_id;
+                    l_errors  (i) := l_batch_err;
                     l_statuses(i) := CASE
                         WHEN l_msgs(i).retry_enabled = 'Y'
                          AND l_msgs(i).retry_count   < l_msgs(i).max_retry_count
                         THEN 'RETRY' ELSE 'ERROR' END;
                 END IF;
-            EXCEPTION
-                WHEN OTHERS THEN
-                    l_errors  (i) := SUBSTR(SQLERRM, 1, 30000);
-                    l_statuses(i) := CASE
-                        WHEN l_msgs(i).retry_enabled = 'Y'
-                         AND l_msgs(i).retry_count   < l_msgs(i).max_retry_count
-                        THEN 'RETRY' ELSE 'ERROR' END;
-            END;
+            END LOOP;
+
+            l_batch_start := l_batch_end + 1;
+
         END LOOP;
 
         -- Update failed rows only
