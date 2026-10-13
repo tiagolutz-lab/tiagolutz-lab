@@ -1802,9 +1802,8 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         FOR i IN 1 .. l_intf_count LOOP
             UPDATE AD_INT_MASTER
                SET LAST_DISPATCHED_DATE = SYSDATE
-             WHERE INTERFACE_ID      = l_intfs(i).interface_id
-               AND STAGE_NUMBER      = l_intfs(i).stage_number
-               AND DISPATCH_FREQUENCY IS NOT NULL;
+             WHERE INTERFACE_ID  = l_intfs(i).interface_id
+               AND STAGE_NUMBER  = l_intfs(i).stage_number;
         END LOOP;
 
         IF l_intf_count > 0 THEN
