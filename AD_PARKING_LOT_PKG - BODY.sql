@@ -1235,7 +1235,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 DBMS_SCHEDULER.EVALUATE_CALENDAR_STRING
                 (
                     calendar_string   => l_expr,
-                    start_date        => SYSTIMESTAMP,
+                    start_date        => TIMESTAMP '1970-01-01 00:00:00 UTC',
                     return_date_after => l_anchor,
                     next_run_date     => l_next_run
                 );
