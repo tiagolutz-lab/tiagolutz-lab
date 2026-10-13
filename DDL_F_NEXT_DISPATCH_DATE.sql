@@ -1,0 +1,81 @@
+-- =============================================================================
+-- DDL_F_NEXT_DISPATCH_DATE.sql
+--
+-- NOTE: F_NEXT_DISPATCH_DATE is implemented as a PUBLIC function inside
+-- AD_PARKING_LOT_PKG (both SPEC and BODY).  It is SQL-callable via the
+-- fully qualified name:
+--
+--   AD_PARKING_LOT_PKG.F_NEXT_DISPATCH_DATE(
+--       p_dispatch_frequency   => m.DISPATCH_FREQUENCY,
+--       p_last_dispatched_date => m.LAST_DISPATCHED_DATE)
+--
+-- This file documents the function's design and example frequency values only.
+-- Deploy by recompiling AD_PARKING_LOT_PKG.
+-- =============================================================================
+--
+-- Purpose:
+--   Evaluates whether an interface is due for dispatch based on one or more
+--   DBMS_SCHEDULER calendar expressions stored in AD_INT_MASTER.DISPATCH_FREQUENCY.
+--
+-- Parameters:
+--   p_dispatch_frequency   VARCHAR2  -- pipe-separated calendar expressions
+--                                    -- NULL = always due (no frequency gate)
+--   p_last_dispatched_date DATE      -- anchor: last time messages were promoted
+--                                    -- NULL = SYSDATE-366 (always due on first run)
+--
+-- Returns: DATE
+--   The earliest next-fire DATE across all expressions relative to the anchor.
+--   Caller checks:  AD_PARKING_LOT_PKG.F_NEXT_DISPATCH_DATE(...) <= SYSDATE
+--
+-- Logic:
+--   - NULL frequency     → return SYSDATE-1 (always due)
+--   - Multiple expressions separated by '|' → OR logic (due if ANY fires)
+--   - LAST_DISPATCHED_DATE used as return_date_after anchor so the window
+--     advances after each dispatch, preventing duplicates within a window
+--   - Evaluation error  → return NULL (safe: NULL <= SYSDATE is FALSE → skip)
+--
+-- =============================================================================
+-- Example DISPATCH_FREQUENCY values
+-- =============================================================================
+--
+-- Every 30 seconds:
+--   FREQ=SECONDLY;INTERVAL=30
+--
+-- Every 5 minutes:
+--   FREQ=MINUTELY;INTERVAL=5
+--
+-- Every 4 hours:
+--   FREQ=HOURLY;INTERVAL=4
+--
+-- Daily at 2 AM and 4 PM:
+--   FREQ=DAILY;BYHOUR=2,16;BYMINUTE=0;BYSECOND=0
+--
+-- 1st of month at 1 AM and 5 AM (two expressions OR-ed):
+--   FREQ=MONTHLY;BYMONTHDAY=1;BYHOUR=1;BYMINUTE=0;BYSECOND=0|FREQ=MONTHLY;BYMONTHDAY=1;BYHOUR=5;BYMINUTE=0;BYSECOND=0
+--
+-- 1st of month at 1 AM & 5 AM, AND 5th of month at 1 AM & 5 PM
+-- (four expressions OR-ed — due if any of the four fires):
+--   FREQ=MONTHLY;BYMONTHDAY=1;BYHOUR=1;BYMINUTE=0;BYSECOND=0|FREQ=MONTHLY;BYMONTHDAY=1;BYHOUR=5;BYMINUTE=0;BYSECOND=0|FREQ=MONTHLY;BYMONTHDAY=5;BYHOUR=1;BYMINUTE=0;BYSECOND=0|FREQ=MONTHLY;BYMONTHDAY=5;BYHOUR=17;BYMINUTE=0;BYSECOND=0
+--
+-- =============================================================================
+-- Robustness for complex scenario (e.g. 1st/5th of month)
+-- =============================================================================
+--
+-- SEQUENCE_MSGS runs on a short-interval scheduler (e.g. every 30s or 5min).
+-- For a monthly schedule, consider:
+--
+--   T=0      Scheduler fires.  LAST_DISPATCHED_DATE = NULL (or last month).
+--            F_NEXT_DISPATCH_DATE evaluates to, say, 1st-of-month 01:00.
+--            SYSDATE >= 01:00 → TRUE → messages promoted.
+--            LAST_DISPATCHED_DATE set to SYSDATE (01:00:05).
+--
+--   T+30s    Scheduler fires again.
+--            F_NEXT_DISPATCH_DATE anchors to 01:00:05, evaluates next fire
+--            → 1st-of-month 05:00 (the next expression in the pipe).
+--            SYSDATE = 01:00:35 < 05:00 → FALSE → no promotion.  ✓
+--
+--   T=05:00  SYSDATE >= 05:00 → TRUE → next batch promoted.
+--            LAST_DISPATCHED_DATE updated to 05:00:xx.
+--            Next anchor → 5th-of-month 01:00.  No more fires until then.  ✓
+--
+-- No GTT, no PL/SQL collection, no separate scheduler job needed.

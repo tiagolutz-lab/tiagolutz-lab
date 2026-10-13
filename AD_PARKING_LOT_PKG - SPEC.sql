@@ -57,6 +57,27 @@ create or replace PACKAGE AD_PARKING_LOT_PKG AS
         p_env_id IN AD_OIC_ENVIRONMENTS.ENV_ID%TYPE
     ) RETURN VARCHAR2;
 
+    -- ── Dispatch frequency gate ───────────────────────────────────────────────
+    -- Evaluates pipe-separated DBMS_SCHEDULER calendar expressions against
+    -- the last-dispatch anchor.  Returns the earliest next-fire DATE across
+    -- all expressions.  Caller checks: F_NEXT_DISPATCH_DATE(...) <= SYSDATE.
+    --
+    -- Public so it can be called from plain SQL (e.g. ad-hoc queries, reports).
+    --
+    -- Parameters:
+    --   p_dispatch_frequency   pipe-separated calendar expressions (or NULL)
+    --   p_last_dispatched_date last time messages were promoted (or NULL)
+    --
+    -- Returns:
+    --   DATE  earliest next-fire date across all expressions
+    --   SYSDATE-1 when p_dispatch_frequency IS NULL (always due)
+    --   NULL  on any evaluation error (safe: NULL <= SYSDATE is FALSE → skipped)
+    FUNCTION F_NEXT_DISPATCH_DATE
+    (
+        p_dispatch_frequency   IN VARCHAR2,
+        p_last_dispatched_date IN DATE
+    ) RETURN DATE;
+
     PROCEDURE SEQUENCE_MSGS;
 
     -- Single entry point — called by scheduler or manually

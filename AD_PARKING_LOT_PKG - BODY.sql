@@ -1186,6 +1186,79 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
 
 
     -- =========================================================================
+    -- F_NEXT_DISPATCH_DATE  (public — SQL-callable)
+    -- Evaluates pipe-separated DBMS_SCHEDULER calendar expressions to determine
+    -- the earliest next-fire DATE for an interface, anchored to the last time
+    -- messages were dispatched.
+    --
+    -- Returns SYSDATE-1 when p_dispatch_frequency IS NULL (always due).
+    -- Returns NULL on evaluation error (safe default: NULL <= SYSDATE = FALSE).
+    --
+    -- Called inside SEQUENCE_MSGS MERGE USING clauses:
+    --   AND (m.DISPATCH_FREQUENCY IS NULL
+    --        OR AD_PARKING_LOT_PKG.F_NEXT_DISPATCH_DATE(
+    --               m.DISPATCH_FREQUENCY, m.LAST_DISPATCHED_DATE) <= SYSDATE)
+    -- =========================================================================
+    FUNCTION F_NEXT_DISPATCH_DATE
+    (
+        p_dispatch_frequency   IN VARCHAR2,
+        p_last_dispatched_date IN DATE
+    ) RETURN DATE
+    IS
+        l_next_run   TIMESTAMP WITH TIME ZONE;
+        l_anchor     TIMESTAMP WITH TIME ZONE;
+        l_earliest   DATE        := NULL;
+        l_pos        PLS_INTEGER := 1;
+        l_pipe       PLS_INTEGER;
+        l_expr       VARCHAR2(4000);
+    BEGIN
+        -- NULL frequency = no gate; always due
+        IF p_dispatch_frequency IS NULL THEN
+            RETURN SYSDATE - 1;
+        END IF;
+
+        -- Anchor: last dispatch, or ~1 year ago so first-ever run is always due
+        l_anchor := CAST(NVL(p_last_dispatched_date, SYSDATE - 366) AS TIMESTAMP WITH TIME ZONE);
+
+        LOOP
+            l_pipe := INSTR(p_dispatch_frequency, '|', l_pos);
+
+            IF l_pipe = 0 THEN
+                l_expr := SUBSTR(p_dispatch_frequency, l_pos);
+            ELSE
+                l_expr := SUBSTR(p_dispatch_frequency, l_pos, l_pipe - l_pos);
+            END IF;
+
+            l_expr := TRIM(l_expr);
+
+            IF l_expr IS NOT NULL THEN
+                DBMS_SCHEDULER.EVALUATE_CALENDAR_STRING
+                (
+                    calendar_string   => l_expr,
+                    start_date        => SYSTIMESTAMP,
+                    return_date_after => l_anchor,
+                    next_run_date     => l_next_run
+                );
+                -- OR logic: keep the earliest next-fire across all expressions
+                IF l_earliest IS NULL OR CAST(l_next_run AS DATE) < l_earliest THEN
+                    l_earliest := CAST(l_next_run AS DATE);
+                END IF;
+            END IF;
+
+            EXIT WHEN l_pipe = 0;
+            l_pos := l_pipe + 1;
+        END LOOP;
+
+        RETURN l_earliest;
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            -- Safe default: NULL <= SYSDATE = FALSE, so the interface is skipped
+            RETURN NULL;
+    END F_NEXT_DISPATCH_DATE;
+
+
+    -- =========================================================================
     -- SEQUENCE_MSGS  (public)
     -- Called at the start of DISPATCH. Promotes eligible msgs from
     -- QUEUED/RETRY to READY_TO_DISPATCH in three set-based statements:
@@ -1225,13 +1298,15 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         -- no row with a lower MSG_ID exists for the same
         -- (INTERFACE_ID, BUSINESS_IDENTIFIER1) in PROCESSING or
         -- READY_TO_DISPATCH status, AND the cross-interface dependency
-        -- gate (AD_INT_DEPENDENCIES) is satisfied for this business key.
+        -- gate (AD_INT_DEPENDENCIES) is satisfied for this business key,
+        -- AND the dispatch frequency gate (F_NEXT_DISPATCH_DATE) allows it.
         --
         -- Implementation: two small scans joined — avoids scanning the large
         -- READY_TO_DISPATCH set together with QUEUED/RETRY candidates:
         --   1. active_mins: aggregate MIN(MSG_ID) per key over PROCESSING +
         --      READY_TO_DISPATCH only — small GROUP BY, no window function
         --   2. candidates: QUEUED/RETRY rows joined to AD_INT_MASTER — small
+        --      (only interfaces whose DISPATCH_FREQUENCY is NULL or past-due)
         --   3. blocked_keys: (INTERFACE_ID, STAGE_NUMBER, BUSINESS_IDENTIFIER1)
         --      tuples whose prerequisite interface still has open messages
         --   4. LEFT JOIN active_mins: eligible when no active row has lower MSG_ID
@@ -1256,6 +1331,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                  GROUP BY INTERFACE_ID, BUSINESS_IDENTIFIER1
             ),
             -- Step 2: candidate rows — QUEUED/RETRY joined to eligible interfaces
+            -- Frequency gate applied here: skip interfaces not yet due for dispatch
             candidates AS
             (
                 SELECT a.ROWID  AS row_id,
@@ -1270,6 +1346,8 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                    AND  m.DISPATCH_TYPE      = 'ATP_INDIVIDUAL'
                    AND  m.INTERFACE_CATEGORY IN ('Processor', 'PostProcessor')
                    AND  m.STATUS             = 'A'
+                   AND  (   m.DISPATCH_FREQUENCY IS NULL
+                         OR F_NEXT_DISPATCH_DATE(m.DISPATCH_FREQUENCY, m.LAST_DISPATCHED_DATE) <= SYSDATE)
                  WHERE a.STATUS IN ('QUEUED', 'RETRY')
             ),
             -- Step 3: blocked keys — prerequisite interface has non-terminal messages
@@ -1343,6 +1421,8 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                AND  (m.WAITING_TIME = 0 OR
                      TRUNC((SYSDATE - a.LAST_UPDATE_DATE) * 24 * 60 * 60)
                      >= m.WAITING_TIME)
+               AND  (   m.DISPATCH_FREQUENCY IS NULL
+                     OR F_NEXT_DISPATCH_DATE(m.DISPATCH_FREQUENCY, m.LAST_DISPATCHED_DATE) <= SYSDATE)
               LEFT JOIN blocked_keys bk
                 ON  bk.INTERFACE_ID         = a.INTERFACE_ID
                AND  bk.STAGE_NUMBER         = a.STAGE_NUMBER
@@ -1392,6 +1472,8 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                AND  (m.WAITING_TIME = 0 OR
                      TRUNC((SYSDATE - a.LAST_UPDATE_DATE) * 24 * 60 * 60)
                      >= m.WAITING_TIME)
+               AND  (   m.DISPATCH_FREQUENCY IS NULL
+                     OR F_NEXT_DISPATCH_DATE(m.DISPATCH_FREQUENCY, m.LAST_DISPATCHED_DATE) <= SYSDATE)
               JOIN
               (
                   -- Minimum sequence per interface — includes READY_TO_DISPATCH
@@ -1711,6 +1793,23 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             END IF;
 
         END LOOP;
+
+        -- ── Frequency gate: advance LAST_DISPATCHED_DATE ──────────────────────
+        -- l_intfs already holds every (INTERFACE_ID, STAGE_NUMBER) that had
+        -- READY_TO_DISPATCH messages this run — no re-scan of AD_MSG_AUDIT needed.
+        -- Stamp only interfaces with an active frequency expression so the
+        -- EVALUATE_CALENDAR_STRING anchor advances past this dispatch window.
+        FOR i IN 1 .. l_intf_count LOOP
+            UPDATE AD_INT_MASTER
+               SET LAST_DISPATCHED_DATE = SYSDATE
+             WHERE INTERFACE_ID      = l_intfs(i).interface_id
+               AND STAGE_NUMBER      = l_intfs(i).stage_number
+               AND DISPATCH_FREQUENCY IS NOT NULL;
+        END LOOP;
+
+        IF l_intf_count > 0 THEN
+            COMMIT;
+        END IF;
 
         DBMS_OUTPUT.PUT_LINE('DISPATCH completed ' || SYSTIMESTAMP);
 
