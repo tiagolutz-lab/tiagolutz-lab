@@ -1,0 +1,9 @@
+{ "MsgId" : 123, 
+"MsgObjectId" : "ABC",
+ "InterfaceId" : "ABC", 
+ "BusinessIdentifier1" : "ABC", 
+"BusinessIdentifier2" : "ABC", 
+"BusinessIdentifier3" : "ABC",
+ "BusinessIdentifier4" : "ABC",
+ "BusinessIdentifier5" : "ABC" 
+ }
