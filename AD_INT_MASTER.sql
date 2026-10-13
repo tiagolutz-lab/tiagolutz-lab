@@ -162,9 +162,9 @@ COMMIT
 --
 -- =============================================================================
 
-ALTER TABLE AD_INT_MASTER ADD DISPATCH_FREQUENCY   VARCHAR2(4000) DEFAULT NULL
+ALTER TABLE AD_INT_MASTER ADD DISPATCH_FREQUENCY    VARCHAR2(4000) DEFAULT NULL
 /
-ALTER TABLE AD_INT_MASTER ADD LAST_DISPATCHED_DATE DATE           DEFAULT NULL
+ALTER TABLE AD_INT_MASTER ADD LAST_DISPATCHED_DATE  DATE           DEFAULT NULL
 /
 
 COMMENT ON COLUMN AD_INT_MASTER.DISPATCH_FREQUENCY IS
@@ -172,5 +172,25 @@ COMMENT ON COLUMN AD_INT_MASTER.DISPATCH_FREQUENCY IS
 /
 COMMENT ON COLUMN AD_INT_MASTER.LAST_DISPATCHED_DATE IS
     'Last time DISPATCH promoted messages for this interface. Set automatically by AD_PARKING_LOT_PKG.DISPATCH. Used as anchor for F_NEXT_DISPATCH_DATE.'
+/
+
+-- =============================================================================
+-- Individual batch size column
+--
+-- INDIVIDUAL_BATCH_SIZE — applies to ATP_INDIVIDUAL interfaces only.
+--                         Controls how many messages are bundled into a single
+--                         OIC invocation. The payload sent to OIC is always a
+--                         JSON array; this column sets the max array length.
+--
+--   NULL or 1 → one message per OIC call (default behaviour)
+--   N         → up to N messages per OIC call
+--
+-- =============================================================================
+
+ALTER TABLE AD_INT_MASTER ADD INDIVIDUAL_BATCH_SIZE NUMBER DEFAULT 1
+/
+
+COMMENT ON COLUMN AD_INT_MASTER.INDIVIDUAL_BATCH_SIZE IS
+    'ATP_INDIVIDUAL only. Max number of messages per OIC invocation. OIC always receives a JSON array. NULL or 1 = one message per call (default).'
 /
 
