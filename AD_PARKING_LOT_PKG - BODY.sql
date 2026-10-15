@@ -1350,14 +1350,14 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                          OR F_NEXT_DISPATCH_DATE(m.DISPATCH_FREQUENCY, m.LAST_DISPATCHED_DATE) <= SYSDATE)
                  WHERE a.STATUS IN ('QUEUED', 'RETRY')
             ),
-            -- Step 3: blocked keys — prerequisite interface has non-terminal messages
-            -- for the same BUSINESS_IDENTIFIER1.  Only active dependency rules.
+            -- Step 3: blocked keys — prerequisite interface has non-terminal messages.
+            -- Global blocking: any non-terminal prereq message blocks the entire
+            -- dependent interface regardless of BUSINESS_IDENTIFIER1.
             blocked_keys AS
             (
                 SELECT DISTINCT
                        d.INTERFACE_ID,
-                       d.STAGE_NUMBER,
-                       prereq.BUSINESS_IDENTIFIER1
+                       d.STAGE_NUMBER
                   FROM AD_INT_DEPENDENCIES d
                   JOIN AD_MSG_AUDIT        prereq
                     ON  prereq.INTERFACE_ID  = d.DEPENDS_ON_INTERFACE_ID
@@ -1375,7 +1375,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
               LEFT JOIN blocked_keys      bk
                 ON  bk.INTERFACE_ID        = c.INTERFACE_ID
                AND  bk.STAGE_NUMBER        = c.STAGE_NUMBER
-               AND  bk.BUSINESS_IDENTIFIER1 = c.BUSINESS_IDENTIFIER1
              WHERE bk.INTERFACE_ID IS NULL          -- dependency gate: not blocked
                AND (   a.min_msg_id IS NULL         -- no active row for this key
                     OR c.MSG_ID < a.min_msg_id)     -- candidate is lower than any active
@@ -1390,7 +1389,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         -- Replaces correlated EXISTS with a join inside the USING clause.
         -- One pass over AD_MSG_AUDIT for QUEUED/RETRY group rows.
         -- Dependency gate: blocked_keys CTE excludes rows whose prerequisite
-        -- interface still has non-terminal messages for the same business key.
+        -- interface still has non-terminal messages (global blocking).
         -- ══════════════════════════════════════════════════════════════════════
         MERGE /*+ enable_parallel_dml parallel(4) */
          INTO AD_MSG_AUDIT tgt
@@ -1400,8 +1399,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             (
                 SELECT DISTINCT
                        d.INTERFACE_ID,
-                       d.STAGE_NUMBER,
-                       prereq.BUSINESS_IDENTIFIER1
+                       d.STAGE_NUMBER
                   FROM AD_INT_DEPENDENCIES d
                   JOIN AD_MSG_AUDIT        prereq
                     ON  prereq.INTERFACE_ID  = d.DEPENDS_ON_INTERFACE_ID
@@ -1426,7 +1424,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
               LEFT JOIN blocked_keys bk
                 ON  bk.INTERFACE_ID         = a.INTERFACE_ID
                AND  bk.STAGE_NUMBER         = a.STAGE_NUMBER
-               AND  bk.BUSINESS_IDENTIFIER1 = a.BUSINESS_IDENTIFIER1
              WHERE a.STATUS IN ('QUEUED', 'RETRY')
                AND bk.INTERFACE_ID IS NULL   -- dependency gate: not blocked
         ) src
@@ -1441,7 +1438,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         -- inline. PARENT_MSG_SEQUENCE used when present, MSG_SEQUENCE otherwise.
         -- Blocking considers all statuses (QUEUED, RETRY, PROCESSING).
         -- Dependency gate: blocked_keys CTE excludes rows whose prerequisite
-        -- interface still has non-terminal messages for the same business key.
+        -- interface still has non-terminal messages (global blocking).
         -- ══════════════════════════════════════════════════════════════════════
         MERGE /*+ enable_parallel_dml parallel(4) */
          INTO AD_MSG_AUDIT tgt
@@ -1451,8 +1448,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             (
                 SELECT DISTINCT
                        d.INTERFACE_ID,
-                       d.STAGE_NUMBER,
-                       prereq.BUSINESS_IDENTIFIER1
+                       d.STAGE_NUMBER
                   FROM AD_INT_DEPENDENCIES d
                   JOIN AD_MSG_AUDIT        prereq
                     ON  prereq.INTERFACE_ID  = d.DEPENDS_ON_INTERFACE_ID
@@ -1523,7 +1519,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
               LEFT JOIN blocked_keys bk
                 ON  bk.INTERFACE_ID         = a.INTERFACE_ID
                AND  bk.STAGE_NUMBER         = a.STAGE_NUMBER
-               AND  bk.BUSINESS_IDENTIFIER1 = a.BUSINESS_IDENTIFIER1
              WHERE bk.INTERFACE_ID IS NULL   -- dependency gate: not blocked
         ) src
         ON (tgt.ROWID = src.row_id)
