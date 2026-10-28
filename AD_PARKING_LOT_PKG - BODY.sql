@@ -1545,6 +1545,55 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
 
 
     -- =========================================================================
+    -- REMOVE_DUPLICATES  (private)
+    -- Deletes duplicate QUEUED/RETRY rows for ATP_INDIVIDUAL interfaces,
+    -- keeping only the lowest MSG_ID per
+    -- (INTERFACE_ID, STAGE_NUMBER, BUSINESS_IDENTIFIER1).
+    -- Called by DISPATCH before SEQUENCE_MSGS.
+    -- =========================================================================
+    PROCEDURE REMOVE_DUPLICATES
+    IS
+    BEGIN
+        DBMS_OUTPUT.PUT_LINE('REMOVE_DUPLICATES started ' || SYSTIMESTAMP);
+
+        DELETE FROM AD_MSG_AUDIT
+         WHERE MSG_ID IN
+               (
+                   SELECT a.MSG_ID
+                     FROM AD_MSG_AUDIT  a
+                     JOIN AD_INT_MASTER m
+                       ON  m.INTERFACE_ID  = a.INTERFACE_ID
+                      AND  m.STAGE_NUMBER  = a.STAGE_NUMBER
+                      AND  m.DISPATCH_TYPE = 'ATP_INDIVIDUAL'
+                      AND  m.STATUS        = 'A'
+                    WHERE a.STATUS IN ('QUEUED', 'RETRY')
+                      AND ROW_NUMBER() OVER
+                          (
+                              PARTITION BY a.INTERFACE_ID,
+                                           a.STAGE_NUMBER,
+                                           a.BUSINESS_IDENTIFIER1
+                              ORDER BY a.MSG_ID
+                          ) > 1
+               );
+
+        DBMS_OUTPUT.PUT_LINE('REMOVE_DUPLICATES deleted ' || SQL%ROWCOUNT || ' rows ' || SYSTIMESTAMP);
+        COMMIT;
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            p_log_error
+            (
+                p_procedure_name => 'AD_PARKING_LOT_PKG.REMOVE_DUPLICATES',
+                p_error_code     => SQLCODE,
+                p_error_message  => SQLERRM
+            );
+            DBMS_OUTPUT.PUT_LINE('REMOVE_DUPLICATES fatal: ' || SQLERRM);
+            RAISE;
+    END REMOVE_DUPLICATES;
+
+
+    -- =========================================================================
     -- DISPATCH  (public — no parameters)
     -- Single entry point. Routes each interface to individual or group logic.
     -- =========================================================================
@@ -1561,7 +1610,10 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
 
         DBMS_OUTPUT.PUT_LINE('DISPATCH started ' || SYSTIMESTAMP);
 
-        -- ── Step 0: Sequence msgs — promote QUEUED/RETRY to READY_TO_DISPATCH ──
+        -- ── Step 0a: Remove duplicates — keep lowest MSG_ID per business key ────
+        REMOVE_DUPLICATES;
+
+        -- ── Step 0b: Sequence msgs — promote QUEUED/RETRY to READY_TO_DISPATCH ──
         SEQUENCE_MSGS;
 
         -- ── Step 1: Discover interfaces with pending msgs ─────────────────────
