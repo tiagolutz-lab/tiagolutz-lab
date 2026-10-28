@@ -1559,21 +1559,26 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         DELETE FROM AD_MSG_AUDIT
          WHERE MSG_ID IN
                (
-                   SELECT a.MSG_ID
-                     FROM AD_MSG_AUDIT  a
-                     JOIN AD_INT_MASTER m
-                       ON  m.INTERFACE_ID  = a.INTERFACE_ID
-                      AND  m.STAGE_NUMBER  = a.STAGE_NUMBER
-                      AND  m.DISPATCH_TYPE = 'ATP_INDIVIDUAL'
-                      AND  m.STATUS        = 'A'
-                    WHERE a.STATUS IN ('QUEUED', 'RETRY')
-                      AND ROW_NUMBER() OVER
-                          (
-                              PARTITION BY a.INTERFACE_ID,
-                                           a.STAGE_NUMBER,
-                                           a.BUSINESS_IDENTIFIER1
-                              ORDER BY a.MSG_ID
-                          ) > 1
+                   SELECT MSG_ID
+                     FROM
+                     (
+                         SELECT a.MSG_ID,
+                                ROW_NUMBER() OVER
+                                (
+                                    PARTITION BY a.INTERFACE_ID,
+                                                 a.STAGE_NUMBER,
+                                                 a.BUSINESS_IDENTIFIER1
+                                    ORDER BY a.MSG_ID
+                                ) AS rn
+                           FROM AD_MSG_AUDIT  a
+                           JOIN AD_INT_MASTER m
+                             ON  m.INTERFACE_ID  = a.INTERFACE_ID
+                            AND  m.STAGE_NUMBER  = a.STAGE_NUMBER
+                            AND  m.DISPATCH_TYPE = 'ATP_INDIVIDUAL'
+                            AND  m.STATUS        = 'A'
+                          WHERE a.STATUS IN ('QUEUED', 'RETRY')
+                     )
+                    WHERE rn > 1
                );
 
         DBMS_OUTPUT.PUT_LINE('REMOVE_DUPLICATES deleted ' || SQL%ROWCOUNT || ' rows ' || SYSTIMESTAMP);
