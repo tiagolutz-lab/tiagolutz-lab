@@ -1768,6 +1768,13 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                     p_global_worker => l_global_worker
                 );
 
+                -- Advance LAST_DISPATCHED_DATE immediately after dispatch
+                UPDATE AD_INT_MASTER
+                   SET LAST_DISPATCHED_DATE = SYSDATE
+                 WHERE INTERFACE_ID = l_intfs(intf).interface_id
+                   AND STAGE_NUMBER = l_intfs(intf).stage_number;
+                COMMIT;
+
             ELSIF l_intfs(intf).dispatch_type = 'ATP_GROUP' THEN
 
                 p_dispatch_group_intf
@@ -1781,6 +1788,13 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                     p_global_worker => l_global_worker
                 );
 
+                -- Advance LAST_DISPATCHED_DATE immediately after dispatch
+                UPDATE AD_INT_MASTER
+                   SET LAST_DISPATCHED_DATE = SYSDATE
+                 WHERE INTERFACE_ID = l_intfs(intf).interface_id
+                   AND STAGE_NUMBER = l_intfs(intf).stage_number;
+                COMMIT;
+
             ELSE
                 DBMS_OUTPUT.PUT_LINE
                 (
@@ -1790,22 +1804,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             END IF;
 
         END LOOP;
-
-        -- ── Frequency gate: advance LAST_DISPATCHED_DATE ──────────────────────
-        -- l_intfs already holds every (INTERFACE_ID, STAGE_NUMBER) that had
-        -- READY_TO_DISPATCH messages this run — no re-scan of AD_MSG_AUDIT needed.
-        -- Stamp only interfaces with an active frequency expression so the
-        -- EVALUATE_CALENDAR_STRING anchor advances past this dispatch window.
-        FOR i IN 1 .. l_intf_count LOOP
-            UPDATE AD_INT_MASTER
-               SET LAST_DISPATCHED_DATE = SYSDATE
-             WHERE INTERFACE_ID  = l_intfs(i).interface_id
-               AND STAGE_NUMBER  = l_intfs(i).stage_number;
-        END LOOP;
-
-        IF l_intf_count > 0 THEN
-            COMMIT;
-        END IF;
 
         DBMS_OUTPUT.PUT_LINE('DISPATCH completed ' || SYSTIMESTAMP);
 
