@@ -2329,31 +2329,30 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 COMMIT;
             END IF;
 
-            IF l_response.status_code = 202 THEN
-                -- Success: all msgs in group stay PROCESSING.
-                -- OIC integration updates STATUS when done.
-                DBMS_OUTPUT.PUT_LINE
-                (
-                    'DISPATCH_GROUP_CHUNK [' || p_chunk_id || '] dispatched OK'
-                );
-            ELSE
-                -- Failure: apply retry logic to ALL msgs in the group
-                l_err_msg := 'HTTP ' || l_response.status_code
-                             || ' for chunk=' || p_chunk_id;
+            IF l_bearer_token IS NOT NULL THEN
+                IF l_response.status_code = 202 THEN
+                    -- Success: all msgs in group stay PROCESSING.
+                    -- OIC integration updates STATUS when done.
+                    NULL;
+                ELSE
+                    -- Failure: apply retry logic to ALL msgs in the group
+                    l_err_msg := 'HTTP ' || l_response.status_code
+                                 || ' for chunk=' || p_chunk_id;
 
-                l_new_status := CASE
-                    WHEN l_rows(1).retry_enabled = 'Y'
-                     AND l_rows(1).retry_count   < l_rows(1).max_retry_count
-                    THEN 'RETRY' ELSE 'ERROR' END;
+                    l_new_status := CASE
+                        WHEN l_rows(1).retry_enabled = 'Y'
+                         AND l_rows(1).retry_count   < l_rows(1).max_retry_count
+                        THEN 'RETRY' ELSE 'ERROR' END;
 
-                UPDATE AD_MSG_AUDIT
-                   SET STATUS           = l_new_status,
-                       ERROR_MESSAGE    = l_err_msg,
-                       RETRY_COUNT      = NVL(RETRY_COUNT, 0) + 1,
-                       LAST_UPDATE_DATE = SYSDATE
-                 WHERE CHUNK_ID = p_chunk_id
-                   AND STATUS   = 'PROCESSING';
-                COMMIT;
+                    UPDATE AD_MSG_AUDIT
+                       SET STATUS           = l_new_status,
+                           ERROR_MESSAGE    = l_err_msg,
+                           RETRY_COUNT      = NVL(RETRY_COUNT, 0) + 1,
+                           LAST_UPDATE_DATE = SYSDATE
+                     WHERE CHUNK_ID = p_chunk_id
+                       AND STATUS   = 'PROCESSING';
+                    COMMIT;
+                END IF;
             END IF;
 
         EXCEPTION
