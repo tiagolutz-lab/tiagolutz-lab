@@ -2119,7 +2119,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                SET STATUS           = l_statuses(i),
                    ERROR_MESSAGE    = l_errors(i),
                    RETRY_COUNT      = NVL(RETRY_COUNT, 0)
-                                      + CASE WHEN l_errors(i) IS NOT NULL THEN 1 ELSE 0 END,
+                                      + CASE WHEN l_statuses(i) = 'RETRY' THEN 1 ELSE 0 END,
                    LAST_UPDATE_DATE = SYSDATE
              WHERE MSG_ID        = l_msg_ids(i)
                AND l_errors(i) IS NOT NULL;
@@ -2347,7 +2347,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                     UPDATE AD_MSG_AUDIT
                        SET STATUS           = l_new_status,
                            ERROR_MESSAGE    = l_err_msg,
-                           RETRY_COUNT      = NVL(RETRY_COUNT, 0) + 1,
+                           RETRY_COUNT      = NVL(RETRY_COUNT, 0) + CASE WHEN l_new_status = 'RETRY' THEN 1 ELSE 0 END,
                            LAST_UPDATE_DATE = SYSDATE
                      WHERE CHUNK_ID = p_chunk_id
                        AND STATUS   = 'PROCESSING';
