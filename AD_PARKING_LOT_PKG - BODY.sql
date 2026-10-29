@@ -688,7 +688,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 p_interface_id   => p_interface_id,
                 p_stage_number   => p_stage_number
             );
-            RAISE;
     END f_compute_interface_quotas;
 
 
@@ -779,7 +778,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 p_error_message  => SQLERRM,
                 p_notes          => 'job=' || p_job_name || ' chunk_id=' || p_chunk_id
             );
-            RAISE;
     END p_submit_job;
 
 
@@ -934,7 +932,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 p_stage_number   => p_stage_number
             );
             IF c_pending%ISOPEN THEN CLOSE c_pending; END IF;
-            RAISE;
     END p_dispatch_individual_intf;
 
 
@@ -1100,7 +1097,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 p_stage_number   => p_stage_number
             );
             IF c_groups%ISOPEN THEN CLOSE c_groups; END IF;
-            RAISE;
     END p_dispatch_group_intf;
 
 
@@ -1181,7 +1177,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             (
                 'SET_ENV_CREDENTIALS error [' || p_env_id || ']: ' || SQLERRM
             );
-            RAISE;
     END SET_ENV_CREDENTIALS;
 
 
@@ -1540,7 +1535,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 p_error_message  => SQLERRM
             );
             DBMS_OUTPUT.PUT_LINE('SEQUENCE_MSGS fatal: ' || SQLERRM);
-            RAISE;
     END SEQUENCE_MSGS;
 
 
@@ -1594,7 +1588,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 p_error_message  => SQLERRM
             );
             DBMS_OUTPUT.PUT_LINE('REMOVE_DUPLICATES fatal: ' || SQLERRM);
-            RAISE;
     END REMOVE_DUPLICATES;
 
 
@@ -1874,7 +1867,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 p_error_message  => SQLERRM
             );
             DBMS_OUTPUT.PUT_LINE('DISPATCH fatal: ' || SQLERRM);
-            RAISE;
     END DISPATCH;
 
 
@@ -2152,7 +2144,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                        LAST_UPDATE_DATE = SYSDATE
                  WHERE CHUNK_ID = p_chunk_id AND STATUS = 'PROCESSING';
                 COMMIT;
-                RAISE;
             END;
     END DISPATCH_INDIVIDUAL_CHUNK;
 
@@ -2394,7 +2385,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                        LAST_UPDATE_DATE = SYSDATE
                  WHERE CHUNK_ID = p_chunk_id AND STATUS = 'PROCESSING';
                 COMMIT;
-                RAISE;
             END;
     END DISPATCH_GROUP_CHUNK;
 
@@ -2540,7 +2530,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 p_error_message  => SQLERRM
             );
             DBMS_OUTPUT.PUT_LINE('DISPATCH_BIP fatal: ' || SQLERRM);
-            RAISE;
     END DISPATCH_BIP;
 
 
@@ -2749,7 +2738,6 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 p_notes          => 'chunk_id=' || p_chunk_id
             );
             DBMS_OUTPUT.PUT_LINE('DISPATCH_BIP_CHUNK fatal: ' || SQLERRM);
-            RAISE;
     END DISPATCH_BIP_CHUNK;
 
 
