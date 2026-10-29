@@ -118,10 +118,10 @@ BEGIN
         SELECT SEND_EMAIL
           INTO l_send_email
           FROM AD_ATP_ERRORS_NOTIFICATIONS
-         WHERE PROCEDURE_NAME = :NEW.PROCEDURE_NAME;
+         WHERE UPPER(PROCEDURE_NAME) = UPPER(:NEW.PROCEDURE_NAME);
     EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            l_send_email := 'N';   -- not configured → silent
+        WHEN OTHERS THEN
+            l_send_email := 'N';   -- not configured or error → silent
     END;
 
     IF l_send_email = 'Y' THEN
