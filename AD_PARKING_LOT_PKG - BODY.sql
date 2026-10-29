@@ -688,6 +688,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 p_interface_id   => p_interface_id,
                 p_stage_number   => p_stage_number
             );
+            RAISE;
     END f_compute_interface_quotas;
 
 
@@ -932,6 +933,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 p_stage_number   => p_stage_number
             );
             IF c_pending%ISOPEN THEN CLOSE c_pending; END IF;
+            RAISE;
     END p_dispatch_individual_intf;
 
 
@@ -1097,6 +1099,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 p_stage_number   => p_stage_number
             );
             IF c_groups%ISOPEN THEN CLOSE c_groups; END IF;
+            RAISE;
     END p_dispatch_group_intf;
 
 
@@ -1177,6 +1180,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             (
                 'SET_ENV_CREDENTIALS error [' || p_env_id || ']: ' || SQLERRM
             );
+            RAISE;
     END SET_ENV_CREDENTIALS;
 
 
