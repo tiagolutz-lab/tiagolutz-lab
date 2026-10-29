@@ -2079,6 +2079,13 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                         || l_msgs(l_batch_start).msg_id || ' will ERROR'
                     );
                     l_batch_err    := 'No Bearer token available for env ' || l_env_id;
+                    p_log_error
+                    (
+                        p_procedure_name => 'AD_PARKING_LOT_PKG.DISPATCH_INDIVIDUAL_CHUNK',
+                        p_error_code     => -20001,
+                        p_error_message  => l_batch_err,
+                        p_notes          => 'env_id=' || l_env_id
+                    );
                     l_batch_status := NULL; -- resolved per-message below
                 END IF;
 
@@ -2300,6 +2307,13 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                     || l_env_id || '] — chunk ' || p_chunk_id || ' will ERROR'
                 );
                 l_err_msg    := 'No Bearer token available for env ' || l_env_id;
+                p_log_error
+                (
+                    p_procedure_name => 'AD_PARKING_LOT_PKG.DISPATCH_GROUP_CHUNK',
+                    p_error_code     => -20001,
+                    p_error_message  => l_err_msg,
+                    p_notes          => 'env_id=' || l_env_id || ' chunk_id=' || p_chunk_id
+                );
                 l_new_status := CASE
                     WHEN l_rows(1).retry_enabled = 'Y'
                      AND l_rows(1).retry_count   < l_rows(1).max_retry_count
