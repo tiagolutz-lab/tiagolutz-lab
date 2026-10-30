@@ -819,16 +819,15 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         c_default_chunk CONSTANT PLS_INTEGER := 50;
         c_fetch_limit   CONSTANT PLS_INTEGER := 1000;
 
-        l_quotas          DBMS_SQL.NUMBER_TABLE;
-        l_env_assigned    t_env_cursor_tab;  -- message count per env (drives chunk boundary)
-        l_chunks_assigned t_env_cursor_tab;  -- chunk count per env (compared against quota)
-        l_all_msg_ids     t_num_tab   := t_num_tab();
-        l_all_chunks      t_vc200_tab := t_vc200_tab();
-        l_fetched_ids     t_num_tab;
-        l_total           PLS_INTEGER := 0;
-        l_chunk_size      PLS_INTEGER;
-        l_env_idx         PLS_INTEGER;
-        l_job_name        VARCHAR2(128);
+        l_quotas       DBMS_SQL.NUMBER_TABLE;
+        l_env_assigned t_env_cursor_tab;
+        l_all_msg_ids  t_num_tab   := t_num_tab();
+        l_all_chunks   t_vc200_tab := t_vc200_tab();
+        l_fetched_ids  t_num_tab;
+        l_total        PLS_INTEGER := 0;
+        l_chunk_size   PLS_INTEGER;
+        l_env_idx      PLS_INTEGER;
+        l_job_name     VARCHAR2(128);
         -- Associative array keyed by chunk_id for O(n) uniqueness check
         TYPE t_chunk_seen_tab IS TABLE OF NUMBER INDEX BY VARCHAR2(200);
         l_seen_chunks  t_chunk_seen_tab;
@@ -870,13 +869,9 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
 
         DBMS_OUTPUT.PUT_LINE('  Pending msgs: ' || l_total);
 
-        -- Compute quotas (deducts from shared pool).
-        -- Unit = one OIC invocation (chunk), not one message.
-        -- With INDIVIDUAL_BATCH_SIZE messages per chunk, l_total messages
-        -- produce CEIL(l_total / l_chunk_size) chunks per env.
+        -- Compute quotas (deducts from shared pool)
         FOR i IN 1 .. p_env_count LOOP
-            l_env_assigned(i)    := 0;
-            l_chunks_assigned(i) := 0;
+            l_env_assigned(i) := 0;
         END LOOP;
 
         f_compute_interface_quotas
@@ -885,7 +880,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             p_env_count     => p_env_count,
             p_interface_id  => p_interface_id,
             p_stage_number  => p_stage_number,
-            p_total_units   => CEIL(l_total / l_chunk_size),
+            p_total_units   => l_total,
             p_interface_cap => p_interface_cap,
             p_quotas        => l_quotas
         );
@@ -901,11 +896,8 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         END LOOP;
 
         FOR i IN 1 .. l_total LOOP
-            -- Advance to next env whose chunk quota is not yet exhausted.
-            -- l_chunks_assigned tracks how many chunks (OIC invocations) have
-            -- been opened for each env; quota is also expressed in chunks.
             WHILE l_env_idx <= p_env_count
-              AND l_chunks_assigned(l_env_idx) >= NVL(l_quotas(l_env_idx), 0)
+              AND l_env_assigned(l_env_idx) >= NVL(l_quotas(l_env_idx), 0)
             LOOP
                 l_env_idx := l_env_idx + 1;
             END LOOP;
@@ -914,9 +906,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 l_all_chunks(i) := NULL;
             ELSE
                 IF MOD(l_env_assigned(l_env_idx), l_chunk_size) = 0 THEN
-                    -- New chunk boundary: open a new worker slot and count it.
-                    p_global_worker              := p_global_worker + 1;
-                    l_chunks_assigned(l_env_idx) := l_chunks_assigned(l_env_idx) + 1;
+                    p_global_worker := p_global_worker + 1;
                 END IF;
                 l_all_chunks(i) :=
                     p_run_id
