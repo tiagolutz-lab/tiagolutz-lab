@@ -875,14 +875,12 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
 
         DBMS_OUTPUT.PUT_LINE('  Pending msgs: ' || l_total);
 
-        -- Compute quotas entirely in chunks so env pool, interface cap, and
-        -- deductions all track OIC invocations, not individual messages.
-        -- Convert available_cap messages → chunks before the call; quotas
-        -- come back in chunks; the pool is left in chunks after the call.
+        -- Compute quotas in chunks. available_cap is already in chunks
+        -- (set from AD_OIC_ENVIRONMENTS.MAX_MSGS which is a chunk cap).
+        -- p_total_units is converted from messages → chunks here.
+        -- l_quotas comes back in chunks; pool is deducted in chunks.
         FOR i IN 1 .. p_env_count LOOP
-            l_env_assigned(i)    := 0;
-            p_envs(i).available_cap :=
-                CEIL(p_envs(i).available_cap / l_chunk_size);
+            l_env_assigned(i) := 0;
         END LOOP;
 
         f_compute_interface_quotas
