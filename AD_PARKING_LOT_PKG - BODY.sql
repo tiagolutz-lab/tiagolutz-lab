@@ -853,10 +853,9 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             RETURN;
         END IF;
 
-        -- Chunk size: use INDIVIDUAL_BATCH_SIZE from AD_INT_MASTER when it
-        -- exceeds the default of 50; otherwise keep 50.
+        -- Chunk size: use INDIVIDUAL_BATCH_SIZE from AD_INT_MASTER (NULL → default).
         BEGIN
-            SELECT GREATEST(c_default_chunk, NVL(INDIVIDUAL_BATCH_SIZE, c_default_chunk))
+            SELECT NVL(INDIVIDUAL_BATCH_SIZE, c_default_chunk)
               INTO l_chunk_size
               FROM AD_INT_MASTER
              WHERE INTERFACE_ID = p_interface_id
@@ -866,6 +865,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             WHEN OTHERS THEN
                 l_chunk_size := c_default_chunk;
         END;
+        IF l_chunk_size < 1 THEN l_chunk_size := 1; END IF;
 
         DBMS_OUTPUT.PUT_LINE('  Pending msgs: ' || l_total);
 
