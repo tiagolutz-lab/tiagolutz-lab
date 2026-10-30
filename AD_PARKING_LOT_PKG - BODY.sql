@@ -894,6 +894,13 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 p_envs(i).available_cap := p_envs(i).available_cap
                                            + l_quotas(i)
                                            - CEIL(l_quotas(i) / l_chunk_size);
+                DBMS_OUTPUT.PUT_LINE
+                (
+                    '  ENV [' || p_envs(i).env_id
+                    || '] pool after chunk adjustment='
+                    || p_envs(i).available_cap
+                    || ' (chunks deducted=' || CEIL(l_quotas(i) / l_chunk_size) || ')'
+                );
             END IF;
         END LOOP;
 
