@@ -816,8 +816,8 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                AND m.DISPATCH_TYPE  = 'ATP_INDIVIDUAL'
              ORDER BY m.PRIORITY, a.MSG_ID;
 
-        c_batch_size  CONSTANT PLS_INTEGER := 50;
-        c_fetch_limit CONSTANT PLS_INTEGER := 1000;
+        c_default_chunk CONSTANT PLS_INTEGER := 50;
+        c_fetch_limit   CONSTANT PLS_INTEGER := 1000;
 
         l_quotas       DBMS_SQL.NUMBER_TABLE;
         l_env_assigned t_env_cursor_tab;
@@ -825,6 +825,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         l_all_chunks   t_vc200_tab := t_vc200_tab();
         l_fetched_ids  t_num_tab;
         l_total        PLS_INTEGER := 0;
+        l_chunk_size   PLS_INTEGER;
         l_env_idx      PLS_INTEGER;
         l_job_name     VARCHAR2(128);
         -- Associative array keyed by chunk_id for O(n) uniqueness check
@@ -851,6 +852,20 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             DBMS_OUTPUT.PUT_LINE('  No pending msgs — skipping.');
             RETURN;
         END IF;
+
+        -- Chunk size: use INDIVIDUAL_BATCH_SIZE from AD_INT_MASTER when it
+        -- exceeds the default of 50; otherwise keep 50.
+        BEGIN
+            SELECT GREATEST(c_default_chunk, NVL(INDIVIDUAL_BATCH_SIZE, c_default_chunk))
+              INTO l_chunk_size
+              FROM AD_INT_MASTER
+             WHERE INTERFACE_ID = p_interface_id
+               AND STAGE_NUMBER = p_stage_number
+               AND STATUS       = 'A';
+        EXCEPTION
+            WHEN OTHERS THEN
+                l_chunk_size := c_default_chunk;
+        END;
 
         DBMS_OUTPUT.PUT_LINE('  Pending msgs: ' || l_total);
 
@@ -890,7 +905,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             IF l_env_idx > p_env_count THEN
                 l_all_chunks(i) := NULL;
             ELSE
-                IF MOD(l_env_assigned(l_env_idx), c_batch_size) = 0 THEN
+                IF MOD(l_env_assigned(l_env_idx), l_chunk_size) = 0 THEN
                     p_global_worker := p_global_worker + 1;
                 END IF;
                 l_all_chunks(i) :=
