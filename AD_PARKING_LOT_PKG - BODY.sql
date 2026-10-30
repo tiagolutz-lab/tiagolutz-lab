@@ -825,8 +825,9 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         l_all_chunks   t_vc200_tab := t_vc200_tab();
         l_fetched_ids  t_num_tab;
         l_total        PLS_INTEGER := 0;
-        l_chunk_size   PLS_INTEGER;
-        l_env_idx      PLS_INTEGER;
+        l_chunk_size     PLS_INTEGER;   -- OIC batch size (msgs per HTTP call; drives pool deduction)
+        l_job_chunk_size PLS_INTEGER;   -- scheduler job size (msgs per job; minimum 50)
+        l_env_idx        PLS_INTEGER;
         l_job_name     VARCHAR2(128);
         -- Associative array keyed by chunk_id for O(n) uniqueness check
         TYPE t_chunk_seen_tab IS TABLE OF NUMBER INDEX BY VARCHAR2(200);
@@ -853,19 +854,24 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             RETURN;
         END IF;
 
-        -- Chunk size: use INDIVIDUAL_BATCH_SIZE from AD_INT_MASTER (NULL → default).
+        -- l_chunk_size     = INDIVIDUAL_BATCH_SIZE (msgs per OIC HTTP call; drives pool deduction).
+        -- l_job_chunk_size = GREATEST(50, INDIVIDUAL_BATCH_SIZE) (msgs per scheduler job; min 50).
         BEGIN
-            SELECT NVL(INDIVIDUAL_BATCH_SIZE, c_default_chunk)
-              INTO l_chunk_size
+            SELECT NVL(INDIVIDUAL_BATCH_SIZE, c_default_chunk),
+                   GREATEST(c_default_chunk, NVL(INDIVIDUAL_BATCH_SIZE, c_default_chunk))
+              INTO l_chunk_size,
+                   l_job_chunk_size
               FROM AD_INT_MASTER
              WHERE INTERFACE_ID = p_interface_id
                AND STAGE_NUMBER = p_stage_number
                AND STATUS       = 'A';
         EXCEPTION
             WHEN OTHERS THEN
-                l_chunk_size := c_default_chunk;
+                l_chunk_size     := c_default_chunk;
+                l_job_chunk_size := c_default_chunk;
         END;
-        IF l_chunk_size < 1 THEN l_chunk_size := 1; END IF;
+        IF l_chunk_size     < 1 THEN l_chunk_size     := 1; END IF;
+        IF l_job_chunk_size < 1 THEN l_job_chunk_size := 1; END IF;
 
         DBMS_OUTPUT.PUT_LINE('  Pending msgs: ' || l_total);
 
@@ -924,7 +930,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             IF l_env_idx > p_env_count THEN
                 l_all_chunks(i) := NULL;
             ELSE
-                IF MOD(l_env_assigned(l_env_idx), l_chunk_size) = 0 THEN
+                IF MOD(l_env_assigned(l_env_idx), l_job_chunk_size) = 0 THEN
                     p_global_worker := p_global_worker + 1;
                 END IF;
                 l_all_chunks(i) :=
