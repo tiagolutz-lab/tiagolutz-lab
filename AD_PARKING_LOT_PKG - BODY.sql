@@ -885,6 +885,18 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             p_quotas        => l_quotas
         );
 
+        -- f_compute_interface_quotas deducted quotas in messages from the shared
+        -- pool. For individual dispatch the cap should track OIC invocations
+        -- (chunks), not messages. Refund the message deduction and re-deduct
+        -- in chunks (CEIL so a partial chunk still counts as one invocation).
+        FOR i IN 1 .. p_env_count LOOP
+            IF NVL(l_quotas(i), 0) > 0 THEN
+                p_envs(i).available_cap := p_envs(i).available_cap
+                                           + l_quotas(i)
+                                           - CEIL(l_quotas(i) / l_chunk_size);
+            END IF;
+        END LOOP;
+
         -- Assign CHUNK_ID per message
         l_all_chunks.EXTEND(l_total);
 
