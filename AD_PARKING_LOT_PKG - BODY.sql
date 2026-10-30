@@ -887,7 +887,12 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             p_interface_id  => p_interface_id,
             p_stage_number  => p_stage_number,
             p_total_units   => l_total,
-            p_interface_cap => p_interface_cap,
+            -- MAX_MSGS on AD_INT_MASTER is a chunk cap for individual dispatch.
+            -- Convert to messages so f_compute_interface_quotas (which works in
+            -- messages) applies the right ceiling. NULL = no cap.
+            p_interface_cap => CASE WHEN p_interface_cap IS NULL THEN NULL
+                                    ELSE p_interface_cap * l_chunk_size
+                               END,
             p_quotas        => l_quotas
         );
 
