@@ -875,9 +875,14 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
 
         DBMS_OUTPUT.PUT_LINE('  Pending msgs: ' || l_total);
 
-        -- Compute quotas (deducts from shared pool)
+        -- Compute quotas entirely in chunks so env pool, interface cap, and
+        -- deductions all track OIC invocations, not individual messages.
+        -- Convert available_cap messages → chunks before the call; quotas
+        -- come back in chunks; the pool is left in chunks after the call.
         FOR i IN 1 .. p_env_count LOOP
-            l_env_assigned(i) := 0;
+            l_env_assigned(i)    := 0;
+            p_envs(i).available_cap :=
+                CEIL(p_envs(i).available_cap / l_chunk_size);
         END LOOP;
 
         f_compute_interface_quotas
@@ -886,36 +891,25 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             p_env_count     => p_env_count,
             p_interface_id  => p_interface_id,
             p_stage_number  => p_stage_number,
-            p_total_units   => l_total,
-            -- MAX_MSGS on AD_INT_MASTER is a chunk cap for individual dispatch.
-            -- Convert to messages so f_compute_interface_quotas (which works in
-            -- messages) applies the right ceiling. NULL = no cap.
-            p_interface_cap => CASE WHEN p_interface_cap IS NULL THEN NULL
-                                    ELSE p_interface_cap * l_chunk_size
-                               END,
-            p_quotas        => l_quotas
+            p_total_units   => CEIL(l_total / l_chunk_size),  -- chunks needed
+            p_interface_cap => p_interface_cap,               -- already in chunks (or NULL)
+            p_quotas        => l_quotas                       -- comes back in chunks
         );
 
-        -- f_compute_interface_quotas deducted quotas in messages from the shared
-        -- pool. For individual dispatch the cap should track OIC invocations
-        -- (chunks), not messages. Refund the message deduction and re-deduct
-        -- in chunks (CEIL so a partial chunk still counts as one invocation).
+        -- Log chunk quotas assigned per env.
         FOR i IN 1 .. p_env_count LOOP
             IF NVL(l_quotas(i), 0) > 0 THEN
-                p_envs(i).available_cap := p_envs(i).available_cap
-                                           + l_quotas(i)
-                                           - CEIL(l_quotas(i) / l_chunk_size);
                 DBMS_OUTPUT.PUT_LINE
                 (
                     '  ENV [' || p_envs(i).env_id
-                    || '] pool after chunk adjustment='
-                    || p_envs(i).available_cap
-                    || ' (chunks deducted=' || CEIL(l_quotas(i) / l_chunk_size) || ')'
+                    || '] pool remaining (chunks)=' || p_envs(i).available_cap
+                    || ' (chunks assigned=' || l_quotas(i) || ')'
                 );
             END IF;
         END LOOP;
 
-        -- Assign CHUNK_ID per message
+        -- Assign CHUNK_ID per message.
+        -- l_quotas(i) is in chunks; convert to messages for boundary checks.
         l_all_chunks.EXTEND(l_total);
 
         l_env_idx := 1;
@@ -927,7 +921,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
 
         FOR i IN 1 .. l_total LOOP
             WHILE l_env_idx <= p_env_count
-              AND l_env_assigned(l_env_idx) >= NVL(l_quotas(l_env_idx), 0)
+              AND l_env_assigned(l_env_idx) >= NVL(l_quotas(l_env_idx), 0) * l_chunk_size
             LOOP
                 l_env_idx := l_env_idx + 1;
             END LOOP;
