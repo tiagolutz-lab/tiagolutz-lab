@@ -1932,6 +1932,11 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         l_base_url     AD_OIC_ENVIRONMENTS.BASE_URL%TYPE;
         l_bearer_token VARCHAR2(4000);
         l_body         CLOB;
+        l_body_blob    BLOB;
+        l_dest_offset  INTEGER;
+        l_src_offset   INTEGER;
+        l_lang_ctx     INTEGER;
+        l_warning      INTEGER;
         l_response     DBMS_CLOUD_TYPES.RESP;
         l_batch_size   PLS_INTEGER;
         l_batch_start  PLS_INTEGER;
@@ -2036,13 +2041,31 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                 END LOOP;
                 DBMS_LOB.APPEND(l_body, TO_CLOB(']'));
 
+                -- Convert CLOB → BLOB (AL32UTF8) so DBMS_CLOUD.SEND_REQUEST
+                -- receives a BLOB with no 32,767-byte VARCHAR2/RAW size limit.
+                DBMS_LOB.CREATETEMPORARY(l_body_blob, TRUE);
+                l_dest_offset := 1;
+                l_src_offset  := 1;
+                l_lang_ctx    := DBMS_LOB.DEFAULT_LANG_CTX;
+                DBMS_LOB.CONVERTTOBLOB
+                (
+                    dest_lob     => l_body_blob,
+                    src_clob     => l_body,
+                    amount       => DBMS_LOB.LOBMAXSIZE,
+                    dest_offset  => l_dest_offset,
+                    src_offset   => l_src_offset,
+                    blob_csid    => 873,   -- AL32UTF8
+                    lang_context => l_lang_ctx,
+                    warning      => l_warning
+                );
+
                 IF l_bearer_token IS NOT NULL THEN
                     l_response := DBMS_CLOUD.SEND_REQUEST
                     (
                         credential_name => NULL,
                         uri             => l_base_url || l_msgs(l_batch_start).oic_resource,
                         method          => DBMS_CLOUD.METHOD_POST,
-                        body            => UTL_RAW.CAST_TO_RAW(l_body),
+                        body            => l_body_blob,
                         headers         => JSON_OBJECT
                                            (
                                                'Content-Type'  VALUE 'application/json',
@@ -2067,7 +2090,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                                 credential_name => NULL,
                                 uri             => l_base_url || l_msgs(l_batch_start).oic_resource,
                                 method          => DBMS_CLOUD.METHOD_POST,
-                                body            => UTL_RAW.CAST_TO_RAW(l_body),
+                                body            => l_body_blob,
                                 headers         => JSON_OBJECT
                                                    (
                                                        'Content-Type'  VALUE 'application/json',
