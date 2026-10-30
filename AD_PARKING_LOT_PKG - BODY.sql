@@ -2015,13 +2015,15 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             l_batch_status := NULL;
 
             BEGIN
-                -- Build JSON array for this batch
+                -- Build JSON array for this batch.
+                -- Use DBMS_LOB.APPEND throughout to avoid the 32,767-byte
+                -- VARCHAR2 limit that triggers ORA-06502 on large batches.
                 l_body := '[';
                 FOR i IN l_batch_start .. l_batch_end LOOP
                     IF i > l_batch_start THEN
-                        l_body := l_body || ',';
+                        DBMS_LOB.APPEND(l_body, TO_CLOB(','));
                     END IF;
-                    l_body := l_body || JSON_OBJECT(
+                    DBMS_LOB.APPEND(l_body, TO_CLOB(JSON_OBJECT(
                                    'MsgId'               VALUE l_msgs(i).msg_id,
                                    'MsgObjectId'         VALUE l_msgs(i).msg_object_id,
                                    'InterfaceId'         VALUE l_msgs(i).interface_id,
@@ -2030,9 +2032,9 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
                                    'BusinessIdentifier3' VALUE l_msgs(i).business_identifier3,
                                    'BusinessIdentifier4' VALUE l_msgs(i).business_identifier4,
                                    'BusinessIdentifier5' VALUE l_msgs(i).business_identifier5
-                               );
+                               )));
                 END LOOP;
-                l_body := l_body || ']';
+                DBMS_LOB.APPEND(l_body, TO_CLOB(']'));
 
                 IF l_bearer_token IS NOT NULL THEN
                     l_response := DBMS_CLOUD.SEND_REQUEST
