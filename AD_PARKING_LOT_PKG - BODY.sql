@@ -825,9 +825,8 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
         l_all_chunks   t_vc200_tab := t_vc200_tab();
         l_fetched_ids  t_num_tab;
         l_total        PLS_INTEGER := 0;
-        l_chunk_size     PLS_INTEGER;   -- OIC batch size (msgs per HTTP call; drives pool deduction)
-        l_job_chunk_size PLS_INTEGER;   -- scheduler job size (msgs per job; minimum 50)
-        l_env_idx        PLS_INTEGER;
+        l_chunk_size   PLS_INTEGER;   -- msgs per DB job / OIC call; GREATEST(50, INDIVIDUAL_BATCH_SIZE)
+        l_env_idx      PLS_INTEGER;
         l_job_name     VARCHAR2(128);
         -- Associative array keyed by chunk_id for O(n) uniqueness check
         TYPE t_chunk_seen_tab IS TABLE OF NUMBER INDEX BY VARCHAR2(200);
@@ -854,31 +853,27 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             RETURN;
         END IF;
 
-        -- l_chunk_size     = INDIVIDUAL_BATCH_SIZE (msgs per OIC HTTP call; drives pool deduction).
-        -- l_job_chunk_size = GREATEST(50, INDIVIDUAL_BATCH_SIZE) (msgs per scheduler job; min 50).
+        -- Chunk size: messages per DB job and per OIC call.
+        -- Minimum 50; honours larger INDIVIDUAL_BATCH_SIZE values.
+        -- Pool deduction and caps are in messages throughout.
         BEGIN
-            SELECT NVL(INDIVIDUAL_BATCH_SIZE, c_default_chunk),
-                   GREATEST(c_default_chunk, NVL(INDIVIDUAL_BATCH_SIZE, c_default_chunk))
-              INTO l_chunk_size,
-                   l_job_chunk_size
+            SELECT GREATEST(c_default_chunk, NVL(INDIVIDUAL_BATCH_SIZE, c_default_chunk))
+              INTO l_chunk_size
               FROM AD_INT_MASTER
              WHERE INTERFACE_ID = p_interface_id
                AND STAGE_NUMBER = p_stage_number
                AND STATUS       = 'A';
         EXCEPTION
             WHEN OTHERS THEN
-                l_chunk_size     := c_default_chunk;
-                l_job_chunk_size := c_default_chunk;
+                l_chunk_size := c_default_chunk;
         END;
-        IF l_chunk_size     < 1 THEN l_chunk_size     := 1; END IF;
-        IF l_job_chunk_size < 1 THEN l_job_chunk_size := 1; END IF;
+        IF l_chunk_size < 1 THEN l_chunk_size := 1; END IF;
 
         DBMS_OUTPUT.PUT_LINE('  Pending msgs: ' || l_total);
 
-        -- Compute quotas in chunks. available_cap is already in chunks
-        -- (set from AD_OIC_ENVIRONMENTS.MAX_MSGS which is a chunk cap).
-        -- p_total_units is converted from messages → chunks here.
-        -- l_quotas comes back in chunks; pool is deducted in chunks.
+        -- Compute quotas in messages. Pool, interface cap, and deductions
+        -- are all in messages. available_cap and p_interface_cap are in
+        -- messages (AD_OIC_ENVIRONMENTS.MAX_MSGS / AD_INT_MASTER.MAX_MSGS).
         FOR i IN 1 .. p_env_count LOOP
             l_env_assigned(i) := 0;
         END LOOP;
@@ -889,25 +884,24 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             p_env_count     => p_env_count,
             p_interface_id  => p_interface_id,
             p_stage_number  => p_stage_number,
-            p_total_units   => CEIL(l_total / l_chunk_size),  -- chunks needed
-            p_interface_cap => p_interface_cap,               -- already in chunks (or NULL)
-            p_quotas        => l_quotas                       -- comes back in chunks
+            p_total_units   => l_total,          -- messages
+            p_interface_cap => p_interface_cap,  -- messages (or NULL)
+            p_quotas        => l_quotas          -- comes back in messages
         );
 
-        -- Log chunk quotas assigned per env.
+        -- Log message quotas assigned per env.
         FOR i IN 1 .. p_env_count LOOP
             IF NVL(l_quotas(i), 0) > 0 THEN
                 DBMS_OUTPUT.PUT_LINE
                 (
                     '  ENV [' || p_envs(i).env_id
-                    || '] pool remaining (chunks)=' || p_envs(i).available_cap
-                    || ' (chunks assigned=' || l_quotas(i) || ')'
+                    || '] pool remaining (msgs)=' || p_envs(i).available_cap
+                    || ' (msgs assigned=' || l_quotas(i) || ')'
                 );
             END IF;
         END LOOP;
 
-        -- Assign CHUNK_ID per message.
-        -- l_quotas(i) is in chunks; convert to messages for boundary checks.
+        -- Assign CHUNK_ID per message. l_quotas(i) is in messages.
         l_all_chunks.EXTEND(l_total);
 
         l_env_idx := 1;
@@ -919,7 +913,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
 
         FOR i IN 1 .. l_total LOOP
             WHILE l_env_idx <= p_env_count
-              AND l_env_assigned(l_env_idx) >= NVL(l_quotas(l_env_idx), 0) * l_chunk_size
+              AND l_env_assigned(l_env_idx) >= NVL(l_quotas(l_env_idx), 0)
             LOOP
                 l_env_idx := l_env_idx + 1;
             END LOOP;
@@ -927,7 +921,7 @@ create or replace PACKAGE BODY AD_PARKING_LOT_PKG AS
             IF l_env_idx > p_env_count THEN
                 l_all_chunks(i) := NULL;
             ELSE
-                IF MOD(l_env_assigned(l_env_idx), l_job_chunk_size) = 0 THEN
+                IF MOD(l_env_assigned(l_env_idx), l_chunk_size) = 0 THEN
                     p_global_worker := p_global_worker + 1;
                 END IF;
                 l_all_chunks(i) :=
