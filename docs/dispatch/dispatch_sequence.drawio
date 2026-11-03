@@ -1,0 +1,456 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- SWIMLANE HEADERS                                -->
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <!-- Scheduler Job -->
+    <mxCell id="p1" value="Scheduler Job" style="text;html=1;strokeColor=none;fillColor=#1F6FEB;fontColor=#ffffff;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="40" y="40" width="120" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="p1l" value="" style="endArrow=none;dashed=1;strokeColor=#1F6FEB;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry x="100" y="90" relative="1" as="geometry">
+        <mxPoint x="100" y="2200" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- DISPATCH() -->
+    <mxCell id="p2" value="DISPATCH()" style="text;html=1;strokeColor=#58A6FF;fillColor=#161B22;fontColor=#58A6FF;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="240" y="40" width="140" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="p2l" value="" style="endArrow=none;dashed=1;strokeColor=#58A6FF;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry x="310" y="90" relative="1" as="geometry">
+        <mxPoint x="310" y="2200" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- AD_MSG_AUDIT + INT_MASTER -->
+    <mxCell id="p3" value="AD_MSG_AUDIT&#xa;+ INT_MASTER" style="text;html=1;strokeColor=#3FB950;fillColor=#161B22;fontColor=#3FB950;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="480" y="40" width="140" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="p3l" value="" style="endArrow=none;dashed=1;strokeColor=#3FB950;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry x="550" y="90" relative="1" as="geometry">
+        <mxPoint x="550" y="2200" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- AD_OIC_ENVIRONMENTS -->
+    <mxCell id="p4" value="AD_OIC&#xa;ENVIRONMENTS" style="text;html=1;strokeColor=#A371F7;fillColor=#161B22;fontColor=#A371F7;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="720" y="40" width="140" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="p4l" value="" style="endArrow=none;dashed=1;strokeColor=#A371F7;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry x="790" y="90" relative="1" as="geometry">
+        <mxPoint x="790" y="2200" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- GET_RUNNING_INSTANCES jobs -->
+    <mxCell id="p5" value="GET_RUNNING&#xa;INSTANCES jobs" style="text;html=1;strokeColor=#E3B341;fillColor=#161B22;fontColor=#E3B341;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="960" y="40" width="140" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="p5l" value="" style="endArrow=none;dashed=1;strokeColor=#E3B341;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry x="1030" y="90" relative="1" as="geometry">
+        <mxPoint x="1030" y="2200" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- p_dispatch_intf -->
+    <mxCell id="p6" value="p_dispatch_intf" style="text;html=1;strokeColor=#79C0FF;fillColor=#161B22;fontColor=#79C0FF;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="1200" y="40" width="140" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="p6l" value="" style="endArrow=none;dashed=1;strokeColor=#79C0FF;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry x="1270" y="90" relative="1" as="geometry">
+        <mxPoint x="1270" y="2200" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- DISPATCH_*_CHUNK jobs -->
+    <mxCell id="p7" value="DISPATCH&#xa;_*_CHUNK jobs" style="text;html=1;strokeColor=#FFA657;fillColor=#161B22;fontColor=#FFA657;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="1440" y="40" width="140" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="p7l" value="" style="endArrow=none;dashed=1;strokeColor=#FFA657;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry x="1510" y="90" relative="1" as="geometry">
+        <mxPoint x="1510" y="2200" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- OIC REST API -->
+    <mxCell id="p8" value="OIC REST API" style="text;html=1;strokeColor=#FF7B72;fillColor=#161B22;fontColor=#FF7B72;align=center;verticalAlign=middle;fontSize=13;fontStyle=1;rounded=1;" vertex="1" parent="1">
+      <mxGeometry x="1680" y="40" width="140" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="p8l" value="" style="endArrow=none;dashed=1;strokeColor=#FF7B72;strokeWidth=1;" edge="1" parent="1">
+      <mxGeometry x="1750" y="90" relative="1" as="geometry">
+        <mxPoint x="1750" y="2200" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- PHASE LABELS                                    -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <mxCell id="ph1" value="① Scheduler trigger — fires every 15 seconds" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#8B949E;align=left;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="40" y="110" width="400" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="ph2" value="② Clean-up &amp; promote messages" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#8B949E;align=left;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="40" y="180" width="400" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="ph3" value="③ Discover interfaces with pending messages" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#8B949E;align=left;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="40" y="390" width="420" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="ph4" value="④ Load active OIC environments + generate run_id" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#8B949E;align=left;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="40" y="590" width="440" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="ph5" value="⑤ Fetch live running instance counts (async, ≤ 5 s)" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#8B949E;align=left;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="40" y="680" width="440" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="ph6" value="⑥ Per-interface dispatch loop (ordered by PRIORITY)" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#8B949E;align=left;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="40" y="1000" width="440" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="ph7a" value="⑦-A  ATP_INDIVIDUAL → p_dispatch_individual_intf()" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#8B949E;align=left;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="40" y="1120" width="480" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="ph8a" value="⑧-A  DISPATCH_INDIVIDUAL_CHUNK(chunk_id) — scheduler job" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#8B949E;align=left;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="40" y="1490" width="520" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="ph7b" value="⑦-B  ATP_GROUP → p_dispatch_group_intf()" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#8B949E;align=left;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="40" y="1760" width="460" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="ph8b" value="⑧-B  DISPATCH_GROUP_CHUNK(chunk_id) — scheduler job" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#8B949E;align=left;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="40" y="1980" width="500" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="ph9" value="⑨ Message lifecycle &amp; cap rules" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#8B949E;align=left;fontSize=11;fontStyle=2;" vertex="1" parent="1">
+      <mxGeometry x="40" y="2150" width="400" height="20" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- ①  SCHEDULER → DISPATCH                        -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <mxCell id="a1" value="DISPATCH()" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#1F6FEB;fontColor=#1F6FEB;fontSize=11;fontStyle=1;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry x="100" y="150" relative="1" as="geometry">
+        <mxPoint x="100" y="150" as="sourcePoint" />
+        <mxPoint x="310" y="150" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- ②  REMOVE_DUPLICATES + SEQUENCE_MSGS           -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <mxCell id="a2" value="REMOVE_DUPLICATES() → delete duplicate MSG_IDs (keep lowest per business key)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#58A6FF;fontColor=#58A6FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="310" y="210" as="sourcePoint" />
+        <mxPoint x="550" y="210" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a3" value="duplicates removed" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6E7681;fontColor=#6E7681;fontSize=10;dashed=1;endArrow=open;endFill=0;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="550" y="240" as="sourcePoint" />
+        <mxPoint x="310" y="240" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a4" value="SEQUENCE_MSGS() → promote QUEUED / RETRY → READY_TO_DISPATCH" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#58A6FF;fontColor=#58A6FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="310" y="290" as="sourcePoint" />
+        <mxPoint x="550" y="290" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a5" value="STATUS updated + COMMIT" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6E7681;fontColor=#6E7681;fontSize=10;dashed=1;endArrow=open;endFill=0;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="550" y="320" as="sourcePoint" />
+        <mxPoint x="310" y="320" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- ③  DISCOVER INTERFACES                          -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <mxCell id="a6" value="SELECT DISTINCT interface_id, stage_number, dispatch_type, priority, max_msgs WHERE STATUS=READY_TO_DISPATCH AND m.STATUS=A AND m.OUTAGE=N" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#58A6FF;fontColor=#58A6FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="310" y="420" as="sourcePoint" />
+        <mxPoint x="550" y="420" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a7" value="l_intfs[] ordered by PRIORITY, INTERFACE_ID, STAGE_NUMBER" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6E7681;fontColor=#6E7681;fontSize=10;dashed=1;endArrow=open;endFill=0;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="550" y="450" as="sourcePoint" />
+        <mxPoint x="310" y="450" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <!-- Note: IF exit -->
+    <mxCell id="n1" value="IF l_intf_count = 0 → EXIT (nothing to dispatch)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262D;strokeColor=#30363D;fontColor=#E3B341;fontSize=10;align=center;" vertex="1" parent="1">
+      <mxGeometry x="340" y="470" width="360" height="30" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- ④  LOAD ENVIRONMENTS                           -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <mxCell id="a8" value="SELECT env_id, base_url, MAX_MSGS FROM AD_OIC_ENVIRONMENTS WHERE STATUS=A" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#58A6FF;fontColor=#58A6FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="310" y="620" as="sourcePoint" />
+        <mxPoint x="790" y="620" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a9" value="l_envs[] + run_id = YYYYMMDDHH24MISSFF3" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6E7681;fontColor=#6E7681;fontSize=10;dashed=1;endArrow=open;endFill=0;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="790" y="650" as="sourcePoint" />
+        <mxPoint x="310" y="650" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- ⑤  RUNNING COUNTS                              -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <mxCell id="a10" value="UPDATE LAST_RUNNING_COUNT = NULL (clear stale values)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#58A6FF;fontColor=#58A6FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="310" y="710" as="sourcePoint" />
+        <mxPoint x="790" y="710" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a11" value="SPAWN 'AD_GET_INST_{run_id}_{i}' per env (auto_drop=TRUE, enabled=TRUE)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#58A6FF;fontColor=#58A6FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="310" y="750" as="sourcePoint" />
+        <mxPoint x="1030" y="750" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a12" value="HTTP GET OIC /monitoring/… → UPDATE LAST_RUNNING_COUNT = N" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#E3B341;fontColor=#E3B341;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1030" y="790" as="sourcePoint" />
+        <mxPoint x="790" y="790" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <!-- Poll note -->
+    <mxCell id="n2" value="POLL every 0.5 s × 10 (5 s max)&#xa;EXIT when all envs have a count&#xa;NULL after timeout → running_count = −1 (static allocation fallback)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262D;strokeColor=#30363D;fontColor=#B1BAC4;fontSize=10;align=center;" vertex="1" parent="1">
+      <mxGeometry x="340" y="820" width="540" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="a13" value="READ LAST_RUNNING_COUNT; SET available_cap = NVL(MAX_MSGS, 2147483647)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#58A6FF;fontColor=#58A6FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="310" y="900" as="sourcePoint" />
+        <mxPoint x="790" y="900" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a14" value="f_get_bearer_token(env_id) — OAuth Bearer (cached or force_fresh)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#58A6FF;fontColor=#58A6FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="310" y="940" as="sourcePoint" />
+        <mxPoint x="790" y="940" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a15" value="bearer_token per env" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6E7681;fontColor=#6E7681;fontSize=10;dashed=1;endArrow=open;endFill=0;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="790" y="970" as="sourcePoint" />
+        <mxPoint x="310" y="970" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- ⑥  PER-INTERFACE LOOP                          -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <mxCell id="n3" value="FOR each interface in l_intfs[] (ordered by PRIORITY, INTERFACE_ID, STAGE_NUMBER)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262D;strokeColor=#30363D;fontColor=#B1BAC4;fontSize=10;align=center;" vertex="1" parent="1">
+      <mxGeometry x="200" y="1030" width="600" height="30" as="geometry" />
+    </mxCell>
+    <mxCell id="a16" value="f_validate_allocation() → check AD_INT_ENV_ALLOCATION sums to 100 %" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#58A6FF;fontColor=#58A6FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="310" y="1080" as="sourcePoint" />
+        <mxPoint x="550" y="1080" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a17" value="TRUE → continue / FALSE → SKIP interface" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6E7681;fontColor=#6E7681;fontSize=10;dashed=1;endArrow=open;endFill=0;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="550" y="1100" as="sourcePoint" />
+        <mxPoint x="310" y="1100" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- ⑦-A  p_dispatch_individual_intf                -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <mxCell id="a18" value="p_dispatch_individual_intf(envs, env_count, interface_id, stage_number, intf_cap, run_id)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#58A6FF;fontColor=#58A6FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="310" y="1150" as="sourcePoint" />
+        <mxPoint x="1270" y="1150" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a19" value="BULK COLLECT LIMIT 1000 — READY_TO_DISPATCH msgs (loop until EOF)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#79C0FF;fontColor=#79C0FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1270" y="1190" as="sourcePoint" />
+        <mxPoint x="550" y="1190" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a20" value="l_all_msg_ids[] total = N messages" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6E7681;fontColor=#6E7681;fontSize=10;dashed=1;endArrow=open;endFill=0;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="550" y="1220" as="sourcePoint" />
+        <mxPoint x="1270" y="1220" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <!-- chunk_size note -->
+    <mxCell id="n4" value="chunk_size = GREATEST(50, NVL(INDIVIDUAL_BATCH_SIZE, 50))&#xa;→ minimum 50 msgs per DB job AND per OIC HTTP call" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262D;strokeColor=#30363D;fontColor=#B1BAC4;fontSize=10;align=center;" vertex="1" parent="1">
+      <mxGeometry x="900" y="1240" width="500" height="45" as="geometry" />
+    </mxCell>
+    <mxCell id="a21" value="f_compute_interface_quotas(total_msgs, intf_cap) [STATIC or DYNAMIC]" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#79C0FF;fontColor=#79C0FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1270" y="1305" as="sourcePoint" />
+        <mxPoint x="790" y="1305" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a22" value="l_quotas[i] per env (in msgs); available_cap deducted" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6E7681;fontColor=#6E7681;fontSize=10;dashed=1;endArrow=open;endFill=0;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="790" y="1335" as="sourcePoint" />
+        <mxPoint x="1270" y="1335" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <!-- CHUNK_ID note -->
+    <mxCell id="n5" value="Assign CHUNK_ID per msg (round-robin across envs by quota)&#xa;chunk_id = &quot;{run_id}_{global_worker}_{env_id}&quot;&#xa;global_worker++ when MOD(assigned_to_env, chunk_size) = 0&#xa;No env capacity → chunk_id = NULL (held over to next run)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#21262D;strokeColor=#30363D;fontColor=#B1BAC4;fontSize=10;align=center;" vertex="1" parent="1">
+      <mxGeometry x="900" y="1355" width="500" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="a23" value="FORALL UPDATE AD_MSG_AUDIT SET STATUS=PROCESSING, CHUNK_ID → COMMIT" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#79C0FF;fontColor=#79C0FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1270" y="1440" as="sourcePoint" />
+        <mxPoint x="550" y="1440" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a24" value="p_submit_job('AD_DISP_IND_{run_id}_{seq}', chunk_id, 'DISPATCH_INDIVIDUAL_CHUNK') × unique chunks" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#79C0FF;fontColor=#79C0FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1270" y="1470" as="sourcePoint" />
+        <mxPoint x="1510" y="1470" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- ⑧-A  DISPATCH_INDIVIDUAL_CHUNK                 -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <mxCell id="a25" value="f_env_from_chunk()→env_id | SELECT BASE_URL | f_get_bearer_token()" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#FFA657;fontColor=#FFA657;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1510" y="1520" as="sourcePoint" />
+        <mxPoint x="550" y="1520" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a26" value="SELECT PROCESSING msgs for chunk (BULK COLLECT)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#FFA657;fontColor=#FFA657;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1510" y="1560" as="sourcePoint" />
+        <mxPoint x="550" y="1560" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a27" value="l_msgs[] + batch_size = NVL(INDIVIDUAL_BATCH_SIZE, 1)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6E7681;fontColor=#6E7681;fontSize=10;dashed=1;endArrow=open;endFill=0;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="550" y="1590" as="sourcePoint" />
+        <mxPoint x="1510" y="1590" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a28" value="Build JSON array [MsgId, MsgObjectId, InterfaceId, BusinessId1..5] via DBMS_LOB.APPEND → CONVERTTOBLOB (avoids ORA-06502)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#FFA657;fontColor=#FFA657;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1510" y="1640" as="sourcePoint" />
+        <mxPoint x="550" y="1640" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a29" value="HTTP POST JSON array BLOB | Authorization: Bearer {token}" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#FFA657;fontColor=#FFA657;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1510" y="1680" as="sourcePoint" />
+        <mxPoint x="1750" y="1680" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a30" value="202 → success (rows stay PROCESSING, OIC calls back) | 401 → refresh + retry once | other → RETRY / ERROR" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6E7681;fontColor=#6E7681;fontSize=10;dashed=1;endArrow=open;endFill=0;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1750" y="1710" as="sourcePoint" />
+        <mxPoint x="1510" y="1710" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a31" value="FORALL UPDATE errors/retries in AD_MSG_AUDIT → COMMIT" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#FFA657;fontColor=#FFA657;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1510" y="1740" as="sourcePoint" />
+        <mxPoint x="550" y="1740" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- ⑦-B  p_dispatch_group_intf                     -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <mxCell id="a32" value="p_dispatch_group_intf(envs, env_count, interface_id, stage_number, intf_cap, run_id)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#58A6FF;fontColor=#58A6FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="310" y="1800" as="sourcePoint" />
+        <mxPoint x="1270" y="1800" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a33" value="SELECT DISTINCT MSG_SEQUENCE, MSG_SUB_GROUP_ID WHERE STATUS=READY_TO_DISPATCH" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#79C0FF;fontColor=#79C0FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1270" y="1840" as="sourcePoint" />
+        <mxPoint x="550" y="1840" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a34" value="l_groups[] total_groups = N" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6E7681;fontColor=#6E7681;fontSize=10;dashed=1;endArrow=open;endFill=0;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="550" y="1870" as="sourcePoint" />
+        <mxPoint x="1270" y="1870" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a35" value="f_compute_interface_quotas(total_groups, intf_cap)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#79C0FF;fontColor=#79C0FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1270" y="1910" as="sourcePoint" />
+        <mxPoint x="790" y="1910" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a36" value="l_quotas[i] per env (in groups); available_cap deducted" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6E7681;fontColor=#6E7681;fontSize=10;dashed=1;endArrow=open;endFill=0;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="790" y="1940" as="sourcePoint" />
+        <mxPoint x="1270" y="1940" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a37" value="FORALL UPDATE AD_MSG_AUDIT SET STATUS=PROCESSING, CHUNK_ID per group → COMMIT" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#79C0FF;fontColor=#79C0FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1270" y="1960" as="sourcePoint" />
+        <mxPoint x="550" y="1960" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a38" value="p_submit_job('AD_DISP_GRP_{run_id}_{seq}', chunk_id, 'DISPATCH_GROUP_CHUNK') × N groups" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#79C0FF;fontColor=#79C0FF;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1270" y="1990" as="sourcePoint" />
+        <mxPoint x="1510" y="1990" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- ⑧-B  DISPATCH_GROUP_CHUNK                      -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <mxCell id="a39" value="f_env_from_chunk()→env_id | SELECT BASE_URL | f_get_bearer_token()" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#FFA657;fontColor=#FFA657;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1510" y="2020" as="sourcePoint" />
+        <mxPoint x="550" y="2020" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a40" value="SELECT PROCESSING msgs for chunk (all belong to one group)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#FFA657;fontColor=#FFA657;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1510" y="2060" as="sourcePoint" />
+        <mxPoint x="550" y="2060" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a41" value="HTTP POST { &quot;msgSequence&quot;: N, &quot;interfaceId&quot;: &quot;X&quot;, &quot;subGroupId&quot;: N, &quot;stageNumber&quot;: N } | Bearer {token}" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#FFA657;fontColor=#FFA657;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1510" y="2100" as="sourcePoint" />
+        <mxPoint x="1750" y="2100" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a42" value="202 → all group rows stay PROCESSING | 401 → refresh + retry once | other → RETRY / ERROR" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6E7681;fontColor=#6E7681;fontSize=10;dashed=1;endArrow=open;endFill=0;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1750" y="2130" as="sourcePoint" />
+        <mxPoint x="1510" y="2130" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="a43" value="UPDATE AD_MSG_AUDIT errors → COMMIT" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#FFA657;fontColor=#FFA657;fontSize=10;endArrow=block;endFill=1;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="1510" y="2160" as="sourcePoint" />
+        <mxPoint x="550" y="2160" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- ⑨  LIFECYCLE + CAP RULES                       -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <mxCell id="n6" value="Message lifecycle:&#xa;QUEUED/RETRY →[SEQUENCE_MSGS]→ READY_TO_DISPATCH →[CHUNK_ID assigned]→ PROCESSING →[OIC callback]→ SUCCESS / ERROR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1C2128;strokeColor=#30363D;fontColor=#E6EDF3;fontSize=11;align=center;" vertex="1" parent="1">
+      <mxGeometry x="200" y="2190" width="1400" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="n7" value="Cap rules (all in messages):&#xa;• AD_OIC_ENVIRONMENTS.MAX_MSGS = available_cap per env per DISPATCH run&#xa;• AD_INT_MASTER.MAX_MSGS = interface cap per run (NULL = unlimited)&#xa;• chunk_size = GREATEST(50, INDIVIDUAL_BATCH_SIZE) → controls DB job granularity AND OIC HTTP batch size" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1C2128;strokeColor=#30363D;fontColor=#B1BAC4;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="200" y="2260" width="1400" height="80" as="geometry" />
+    </mxCell>
+
+  </root>
+</mxGraphModel>
