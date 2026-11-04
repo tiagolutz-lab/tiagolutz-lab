@@ -9,18 +9,25 @@ CREATE SEQUENCE ad_file_log_seq NOCACHE;
 
 -- Buckets to poll. Add a row to start processing a bucket; no code or job change.
 -- Set ENABLED = 'N' to pause a bucket without deleting it.
+-- The object URI is built as: BASE_URL || '/n/' || NAMESPACE || '/b/' || BUCKET_NAME || '/o/'
+-- so the endpoint is changed here, not in code.
+-- Buckets are read in PRIORITY order: the LOWEST number is read FIRST (1 before 2);
+-- equal priorities are read in bucket-name order.
 CREATE TABLE ad_bucket_config (
-  bucket_name  VARCHAR2(256) NOT NULL,
-  namespace    VARCHAR2(100) NOT NULL,   -- Object Storage namespace of the tenancy
-  region       VARCHAR2(50)  NOT NULL,   -- for example eu-dublin-1
-  enabled      VARCHAR2(1)   DEFAULT 'Y' NOT NULL,
+  bucket_name  VARCHAR2(256)  NOT NULL,
+  namespace    VARCHAR2(100)  NOT NULL,   -- Object Storage namespace of the tenancy
+  base_url     VARCHAR2(500)  NOT NULL,   -- for example https://objectstorage.eu-dublin-1.oraclecloud.com
+  priority     NUMBER         DEFAULT 100 NOT NULL,
+  enabled      VARCHAR2(1)    DEFAULT 'Y' NOT NULL,
   CONSTRAINT ad_bucket_config_pk PRIMARY KEY (bucket_name),
   CONSTRAINT ad_bucket_config_ck CHECK (enabled IN ('Y', 'N'))
 );
 
 -- Sample rows are disabled so nothing runs until real values are entered.
-INSERT INTO ad_bucket_config (bucket_name, namespace, region, enabled) VALUES ('<bucket-a>', '<namespace>', '<region>', 'N');
-INSERT INTO ad_bucket_config (bucket_name, namespace, region, enabled) VALUES ('<bucket-b>', '<namespace>', '<region>', 'N');
+INSERT INTO ad_bucket_config (bucket_name, namespace, base_url, priority, enabled)
+VALUES ('<bucket-a>', '<namespace>', 'https://objectstorage.<region>.oraclecloud.com', 10, 'N');
+INSERT INTO ad_bucket_config (bucket_name, namespace, base_url, priority, enabled)
+VALUES ('<bucket-b>', '<namespace>', 'https://objectstorage.<region>.oraclecloud.com', 20, 'N');
 
 -- Successfully processed files only. One row per bucket + object.
 -- A file appears here in the same transaction as its loaded rows.

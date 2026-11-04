@@ -58,10 +58,14 @@ that old. The default `0` transfers immediately, so it can differ per server and
 
 - Every custom ATP object starts with `AD_` (tables, sequence, package, scheduler job, constraints).
 - Buckets are not written into any code or job. They are rows in `AD_BUCKET_CONFIG`
-  (bucket name, namespace, region, enabled `Y`/`N`). To add a bucket, insert a row; to pause one, set
-  `enabled = 'N'`. The sample rows are disabled until real values are entered.
-- One job reads the enabled buckets and processes them one after another. A failure stops only the bucket
-  it happened in; the others carry on.
+  (bucket name, namespace, base URL, priority, enabled `Y`/`N`). To add a bucket, insert a row; to pause
+  one, set `enabled = 'N'`. The sample rows are disabled until real values are entered.
+- The Object Storage endpoint is the `base_url` column (for example
+  `https://objectstorage.eu-dublin-1.oraclecloud.com`), not code. The URI is built as
+  `base_url/n/<namespace>/b/<bucket>/o/`.
+- `priority` sets the read order: the lowest number is read first, ties go by bucket name.
+- One job reads the enabled buckets in priority order and processes them one after another, draining each
+  before the next. A failure stops only the bucket it happened in; the others carry on.
 
 ## Add a new SFTP server
 

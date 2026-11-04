@@ -1,7 +1,8 @@
 -- =============================================================================
 -- 02_persist_pkg.sql
 -- AD_FILE_PERSIST_PKG: ordered, stop-on-failure processing of files landed in
--- Object Storage buckets. Buckets are read from AD_BUCKET_CONFIG.
+-- Object Storage buckets. Buckets, their endpoint URL and their priority order are
+-- read from AD_BUCKET_CONFIG.
 --
 -- Order: oldest object (Object Storage creation time) first, ties broken by name.
 -- Each file is loaded and logged in ONE transaction, so a failure rolls back both
@@ -25,8 +26,9 @@ CREATE OR REPLACE PACKAGE ad_file_persist_pkg AS
   PROCEDURE process_all (p_bucket_uri IN VARCHAR2,
                          p_bucket     IN VARCHAR2);
 
-  -- Drains every enabled bucket in AD_BUCKET_CONFIG. A failure stops only that
-  -- bucket (it is already recorded in AD_FILE_ERROR); the others still run.
+  -- Drains every enabled bucket in AD_BUCKET_CONFIG, lowest PRIORITY number first.
+  -- A failure stops only that bucket (it is already recorded in AD_FILE_ERROR); the
+  -- others still run.
   PROCEDURE process_all_buckets;
 END ad_file_persist_pkg;
 /
@@ -35,10 +37,10 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
 
   c_cred CONSTANT VARCHAR2(30) := 'OCI$RESOURCE_PRINCIPAL';
 
-  FUNCTION bucket_uri (p_bucket VARCHAR2, p_namespace VARCHAR2, p_region VARCHAR2) RETURN VARCHAR2 IS
+  -- The endpoint comes from AD_BUCKET_CONFIG.BASE_URL; nothing is hard-coded here.
+  FUNCTION bucket_uri (p_bucket VARCHAR2, p_namespace VARCHAR2, p_base_url VARCHAR2) RETURN VARCHAR2 IS
   BEGIN
-    RETURN 'https://objectstorage.' || p_region || '.oraclecloud.com/n/' || p_namespace
-           || '/b/' || p_bucket || '/o/';
+    RETURN RTRIM(p_base_url, '/') || '/n/' || p_namespace || '/b/' || p_bucket || '/o/';
   END bucket_uri;
 
   -- Autonomous, so the failure record survives the rollback of the file's load.
@@ -165,13 +167,13 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
   -- ---- All enabled buckets from AD_BUCKET_CONFIG -------------------------------
   PROCEDURE process_all_buckets IS
   BEGIN
-    FOR b IN (SELECT bucket_name, namespace, region
+    FOR b IN (SELECT bucket_name, namespace, base_url
               FROM   ad_bucket_config
               WHERE  enabled = 'Y'
-              ORDER  BY bucket_name)
+              ORDER  BY priority, bucket_name)
     LOOP
       BEGIN
-        process_all(bucket_uri(b.bucket_name, b.namespace, b.region), b.bucket_name);
+        process_all(bucket_uri(b.bucket_name, b.namespace, b.base_url), b.bucket_name);
       EXCEPTION
         WHEN OTHERS THEN
           NULL;   -- already recorded in AD_FILE_ERROR; ordering is per bucket, so carry on with the others
