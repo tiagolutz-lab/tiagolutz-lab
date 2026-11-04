@@ -16,9 +16,9 @@ No credentials belong in this repository.
 | `config/rclone.conf.example` | One rclone remote per SFTP server, plus the OCI remote |
 | `config/server1-bucket-a.env.example` | Per-pair settings consumed by the unit |
 | `iam/policy.example.txt` | Dynamic group and policy statements for the VM and for ATP |
-| `atp/01_ddl.sql` | Control, error, config, staging and sample target tables |
-| `atp/02_persist_pkg.sql` | Ordered loader with CSV, JSON and XML filtering examples |
-| `atp/03_scheduler_job.sql` | 15-second polling job per bucket |
+| `atp/01_ddl.sql` | `AD_BUCKET_CONFIG`, `AD_FILE_LOG`, `AD_FILE_ERROR`, `AD_FILTER_CONFIG`, staging and sample target tables |
+| `atp/02_persist_pkg.sql` | `AD_FILE_PERSIST_PKG`: ordered loader with CSV, JSON and XML filtering examples |
+| `atp/03_scheduler_job.sql` | Job `AD_PERSIST_FILES`: polls every enabled bucket in `AD_BUCKET_CONFIG` every 15 seconds |
 | `tests/` | Stub-rclone behavioural tests for the ordering logic (`bash tests/test_ordering.sh`) |
 
 ## Ordering guarantees
@@ -48,6 +48,15 @@ that old. The default `0` transfers immediately, so it can differ per server and
 - A file moves between `MIN_AGE_SECONDS` and `MIN_AGE_SECONDS` plus the polling interval after it appears.
 - Age is measured against the VM clock. Keep the VM on NTP; if the SFTP server clock runs ahead, files
   wait longer than intended.
+
+## ATP conventions and buckets
+
+- Every custom ATP object starts with `AD_` (tables, sequence, package, scheduler job, constraints).
+- Buckets are not written into any code or job. They are rows in `AD_BUCKET_CONFIG`
+  (bucket name, namespace, region, enabled `Y`/`N`). To add a bucket, insert a row; to pause one, set
+  `enabled = 'N'`. The sample rows are disabled until real values are entered.
+- One job reads the enabled buckets and processes them one after another. A failure stops only the bucket
+  it happened in; the others carry on.
 
 ## Add a new SFTP server
 
