@@ -5,6 +5,8 @@ Wants=network-online.target
 
 [Service]
 User=rclone-svc
+# Holds the late-file high-water mark (/var/lib/sftp2oci), owned by the service user
+StateDirectory=sftp2oci
 Environment=PAIR_ID=%i
 # Uncomment during the parallel-run phase (no deletes on SFTP):
 # Environment=RCLONE_MODE=copy

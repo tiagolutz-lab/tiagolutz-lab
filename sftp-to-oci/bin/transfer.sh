@@ -8,15 +8,39 @@
 # Example:
 #   transfer.sh sftp-server1 /outbound/a 'ad_*.xml' bucket-a 15
 #
+# Ordering guarantees
+#   * The folder is listed again before EVERY file, and the oldest remaining file is
+#     picked each time. A file that arrives mid-run with an older key is therefore
+#     picked next, not after the whole batch.
+#   * One file at a time; the next starts only after the previous one is uploaded
+#     (and, in move mode, deleted from SFTP).
+#   * A failed file stops the cycle. The next cycle retries that same file first.
+#   * In move mode a high-water mark records the newest key already transferred. If a
+#     file later shows up with an OLDER key (it arrived late, or the sender preserved an
+#     old timestamp), the script logs ORDER_VIOLATION so it can be alerted on. The
+#     file is still transferred: blocking forever would stall the pair.
+#
+# What "oldest" means (ORDER_KEY)
+#   mtime (default)  modified time on the SFTP server, one-second precision, ties broken
+#                    by name. SFTP records no arrival time. This is only arrival order if
+#                    the sender sets the time when the file is written and does not
+#                    preserve the source file's original timestamp.
+#   name             sort by file name. Use when names carry a zero-padded sequence number
+#                    or an ISO timestamp (for example ad_20261104T091500_0001.xml). This is
+#                    the most reliable key when the sender can provide one.
+#
 # Environment (all optional):
 #   RCLONE_MODE   move (default) or copy. Use copy during the parallel-run phase.
-#   PAIR_ID       unique name for this pair; used for lock and log file names.
+#   ORDER_KEY     mtime (default) or name
+#   PAIR_ID       unique name for this pair; used for lock, log and state file names
 #   RCLONE_CONF   path to rclone.conf (default /etc/rclone/rclone.conf)
 #   LOG_DIR       log directory (default /var/log/rclone)
 #   LOCK_DIR      lock directory (default /tmp)
+#   STATE_DIR     high-water-mark directory (default /var/lib/sftp2oci)
 #
 # interval_seconds = 0 (default) runs one cycle and exits. Anything greater loops forever.
 set -uo pipefail
+export LC_ALL=C   # byte-wise, locale-independent sorting and comparison
 
 REMOTE="${1:?rclone remote, e.g. sftp-server1}"
 SRC="${2:?sftp folder}"
@@ -25,14 +49,20 @@ BUCKET="${4:?bucket}"
 INTERVAL="${5:-0}"
 
 MODE="${RCLONE_MODE:-move}"
+ORDER_KEY="${ORDER_KEY:-mtime}"
 ID="${PAIR_ID:-${REMOTE}-${BUCKET}}"
 RCLONE_CONF="${RCLONE_CONF:-/etc/rclone/rclone.conf}"
 LOG_DIR="${LOG_DIR:-/var/log/rclone}"
 LOCK_DIR="${LOCK_DIR:-/tmp}"
+STATE_DIR="${STATE_DIR:-/var/lib/sftp2oci}"
 
 case "$MODE" in
   move|copy) ;;
   *) echo "RCLONE_MODE must be move or copy, got: $MODE" >&2; exit 2 ;;
+esac
+case "$ORDER_KEY" in
+  mtime|name) ;;
+  *) echo "ORDER_KEY must be mtime or name, got: $ORDER_KEY" >&2; exit 2 ;;
 esac
 
 mkdir -p "$LOG_DIR"
@@ -43,20 +73,74 @@ flock -n 9 || { echo "already running for $ID"; exit 0; }
 
 log() { echo "$(date -Is) [$ID] $*" | tee -a "$LOG_DIR/${ID}.log"; }
 
-run_once() {
-  local list line name
+# High-water mark: only meaningful in move mode, where transferred files leave the
+# folder (in copy mode they stay, so older files are legitimately seen every cycle).
+HWM_FILE=""
+if [ "$MODE" = move ]; then
+  if mkdir -p "$STATE_DIR" 2>/dev/null; then
+    HWM_FILE="${STATE_DIR}/${ID}.hwm"
+  else
+    log "WARNING cannot create $STATE_DIR; late-file detection disabled"
+  fi
+fi
 
-  # Matching files as "modtime|name", oldest first (ties broken by name).
+# Key used for ordering, from a "modtime|name" line.
+key_of() { if [ "$ORDER_KEY" = name ]; then printf '%s' "${1#*|}"; else printf '%s' "${1%%|*}"; fi; }
+
+# Prints the next file as "modtime|name" (oldest first, skipping names already handled
+# in this cycle), or nothing when there is none. Non-zero if the listing fails.
+next_file() {
+  local list sorted line n
   list=$(rclone lsf "${REMOTE}:${SRC}" \
       --config "$RCLONE_CONF" \
       --files-only --max-depth 1 \
       --include "$PATTERN" \
-      --format "tp" --separator "|" | sort -t'|' -k1,1 -k2,2) || return 1
-
+      --format "tp" --separator "|") || return 1
   [ -z "$list" ] && return 0
 
+  if [ "$ORDER_KEY" = name ]; then
+    sorted=$(sort -t'|' -k2 <<< "$list")
+  else
+    sorted=$(sort -t'|' -k1,1 -k2 <<< "$list")
+  fi
+
   while IFS= read -r line; do
+    n="${line#*|}"
+    [ -n "${seen[$n]:-}" ] && continue
+    printf '%s\n' "$line"
+    return 0
+  done <<< "$sorted"
+}
+
+# Flag a file whose key is older than one already transferred.
+check_late() {
+  [ -n "$HWM_FILE" ] && [ -s "$HWM_FILE" ] || return 0
+  local hwm; hwm=$(<"$HWM_FILE")
+  if [[ "$(key_of "$1")" < "$(key_of "$hwm")" ]]; then
+    log "ORDER_VIOLATION '${1#*|}' (${ORDER_KEY} $(key_of "$1")) is older than the last transferred '${hwm#*|}' (${ORDER_KEY} $(key_of "$hwm")); it arrived late. Transferring anyway."
+  fi
+}
+
+# Keep the highest key transferred so far.
+record_hwm() {
+  [ -n "$HWM_FILE" ] || return 0
+  local cur=""
+  [ -s "$HWM_FILE" ] && cur=$(<"$HWM_FILE")
+  if [ -z "$cur" ] || ! [[ "$(key_of "$1")" < "$(key_of "$cur")" ]]; then
+    printf '%s\n' "$1" > "$HWM_FILE"
+  fi
+}
+
+run_once() {
+  local -A seen=()
+  local line name
+
+  while true; do
+    line=$(next_file) || return 1
+    [ -z "$line" ] && return 0
     name="${line#*|}"
+
+    check_late "$line"
     log "START $name"
     rclone "${MODE}to" "${REMOTE}:${SRC}/${name}" "oci:${BUCKET}/${name}" \
       --config "$RCLONE_CONF" \
@@ -67,8 +151,11 @@ run_once() {
       --retries 5 --low-level-retries 20 \
       --log-level INFO --log-file "$LOG_DIR/${ID}.rclone.log" \
       || { log "FAILED $name - stopping cycle to keep order"; return 1; }
+
+    seen["$name"]=1   # copy mode leaves the file in place; do not pick it again this cycle
+    record_hwm "$line"
     log "DONE $name"
-  done <<< "$list"
+  done
 }
 
 while true; do

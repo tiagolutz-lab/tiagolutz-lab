@@ -19,6 +19,21 @@ No credentials belong in this repository.
 | `atp/01_ddl.sql` | Control, error, config, staging and sample target tables |
 | `atp/02_persist_pkg.sql` | Ordered loader with CSV, JSON and XML filtering examples |
 | `atp/03_scheduler_job.sql` | 15-second polling job per bucket |
+| `tests/` | Stub-rclone behavioural tests for the ordering logic (`bash tests/test_ordering.sh`) |
+
+## Ordering guarantees
+
+- The folder is listed again before every file and the oldest remaining file is picked, so a file
+  arriving mid-run with an older key is handled in its proper place.
+- One file at a time; the next starts only after the previous one is uploaded (and deleted in move mode).
+- A failed file stops the cycle; the next cycle retries it first. Nothing is skipped.
+- In move mode a high-water mark is kept in `/var/lib/sftp2oci`. A file that appears with an older key
+  than one already transferred is still transferred, and `ORDER_VIOLATION` is logged. Alert on that string.
+- `ORDER_KEY=mtime` (default) orders by SFTP modified time, which is arrival order only if the sender sets
+  it at write time and does not preserve the source file's timestamp. Verify this with the sender.
+  `ORDER_KEY=name` orders by file name and is the most reliable choice when names carry a zero-padded
+  sequence number or ISO timestamp.
+- SFTP stores no arrival time and modified time has one-second precision; ties are broken by name.
 
 ## Add a new SFTP server
 
@@ -32,5 +47,7 @@ No credentials belong in this repository.
 
 ## Status
 
-The shell script and unit follow the design agreed in discussion. The SQL is sample code
-written without a database to test against: validate it in a non-production ATP before use.
+`tests/test_ordering.sh` (14 checks, stub rclone) covers oldest-first order, tie-breaking, mid-run
+arrivals, late-file detection, failure and resume, copy mode and name ordering. It has not been run
+against a real SFTP server or bucket. The SQL is sample code written without a database to test
+against: validate it in a non-production ATP before use.
