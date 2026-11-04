@@ -8,7 +8,8 @@
 --
 -- PREREQUISITE (OCI admin team, see ../iam/policy.example.txt):
 --   a dynamic group matching this Autonomous Database, and a policy letting that
---   group list, read and delete objects in the target buckets. Oracle caches the resource principal
+--   group list, read and delete objects in the source buckets, and create
+--   objects in the shared archive and error buckets. Oracle caches the resource principal
 --   token for two hours, so a change to the dynamic group or policy can take up to
 --   two hours to take effect. If the tenancy uses identity domains, the policy must
 --   name the group as <identity_domain_name>/<dynamic-group-name>.

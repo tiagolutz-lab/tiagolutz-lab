@@ -12,10 +12,13 @@
 -- buckets at it with UPDATE ad_bucket_config SET job_name = 'AD_PERSIST_FILES_C' ...
 --
 -- Buckets are not named here. To add one:
---   INSERT INTO ad_bucket_config (bucket_uri, description, job_name, priority, load_procedure)
+--   INSERT INTO ad_bucket_config (bucket_uri, description, job_name, priority, load_procedure,
+--                                 archive_uri, error_uri, max_attempts)
 --   VALUES ('https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket>/o/',
 --           'What the bucket holds and which interface it serves', 'AD_PERSIST_FILES_A', 10,
---           'AD_FILE_PERSIST_PKG.LOAD_DEFAULT');
+--           'AD_FILE_PERSIST_PKG.LOAD_DEFAULT',
+--           'https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<archive-bucket>/o/',
+--           'https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<error-bucket>/o/', 3);
 --   COMMIT;
 -- To move a bucket to another job:
 --   UPDATE ad_bucket_config SET job_name = 'AD_PERSIST_FILES_B' WHERE bucket_uri = '<bucket uri>';
@@ -58,6 +61,10 @@ END;
 -- WHERE  c.enabled = 'Y'
 -- AND    NOT EXISTS (SELECT 1 FROM user_scheduler_jobs j WHERE j.job_name = c.job_name);
 
--- Alert on new rows in AD_FILE_ERROR, or on a file failing repeatedly:
+-- Alert on any QUARANTINED row (a file went to the error bucket and the load order was
+-- skipped) and on MOVE rows (archive or quarantine move failing):
+-- SELECT bucket_uri, object_name, error_type, failed_at, error_text
+-- FROM   ad_file_error WHERE error_type IN ('QUARANTINED', 'MOVE') AND failed_at > SYSTIMESTAMP - INTERVAL '1' DAY;
+-- A bucket that is blocked right now has LOAD rows for the same file piling up:
 -- SELECT bucket_uri, object_name, COUNT(*) attempts, MAX(failed_at) last_failure
--- FROM   ad_file_error GROUP BY bucket_uri, object_name HAVING COUNT(*) >= 3;
+-- FROM   ad_file_error WHERE error_type = 'LOAD' GROUP BY bucket_uri, object_name HAVING COUNT(*) >= 3;

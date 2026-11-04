@@ -53,12 +53,13 @@ that old. The default `0` transfers immediately, so it can differ per server and
 ## ATP conventions and buckets
 
 - ATP reads the buckets with its own identity (resource principal), so no keys are stored. The OCI admin
-  team creates a dynamic group for the database and a policy allowing list, read and delete on the buckets; the DBA then runs
+  team creates a dynamic group for the database and a policy allowing list, read and delete on the source buckets and create on the archive and error buckets; the DBA then runs
   `atp/00_connect_to_object_storage.sql`. Full steps are in section 8.1 of the spec.
 
 - Every custom ATP object starts with `AD_` (tables, sequence, package, scheduler job, constraints).
 - Buckets are not written into any code or job. They are rows in `AD_BUCKET_CONFIG`
-  (`bucket_uri`, `description`, `job_name`, `priority`, `load_procedure`, `enabled` `Y`/`N`). To add a bucket, insert a row; to pause
+  (`bucket_uri`, `description`, `job_name`, `priority`, `load_procedure`, `archive_uri`, `error_uri`,
+  `max_attempts`, `enabled` `Y`/`N`). To add a bucket, insert a row; to pause
   one, set `enabled = 'N'`. The sample rows are disabled until real values are entered.
 - `bucket_uri` is the full URI of the bucket, so the endpoint, namespace and bucket all live in the table:
   `https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket>/o/`. A missing trailing `/`
@@ -74,10 +75,17 @@ that old. The default `0` transfers immediately, so it can differ per server and
   changes. A bucket has one job only, so jobs never overlap on a bucket and its order holds. A `job_name`
   with no matching job means the bucket is never processed; `03_scheduler_job.sql` has a query to catch it.
 - `description` is free text: what the bucket holds and which interface it serves.
-- After a file is loaded and committed, ATP deletes it from the bucket. If the delete fails, the file is
-  already in `AD_FILE_LOG` so it is not loaded twice; the delete is retried at the start of the next run
-  and each failure is written to `AD_FILE_ERROR`. A file that fails to load stays in the bucket and blocks
-  that bucket (unchanged; error handling is still to be decided).
+- **Success:** after a file is loaded and committed, ATP moves it (copy, then delete) from the bucket to the
+  shared archive bucket (`archive_uri`), stored as `<source bucket>/<yyyy-mm-dd>/<file_id>_<object>` so
+  integrations sharing the archive never overwrite each other. If the move fails, the file is already in
+  `AD_FILE_LOG` so it is not loaded twice; the move is retried at the start of the next run.
+- **Failure:** the file's work is rolled back, a `LOAD` row goes to `AD_FILE_ERROR`, and the bucket is blocked
+  while the file is retried each run. After `max_attempts` failed attempts (default 3, about 45 seconds at a
+  15-second poll) the file is moved to the shared error bucket (`error_uri`), a `QUARANTINED` row is written,
+  and the bucket carries on with the next file. **That deliberately skips the load order for that file.**
+  Raise `max_attempts` for an interface that must never skip, or if short outages should not quarantine files.
+  If the move to the error bucket fails, or the failure happens before a file is chosen (for example listing
+  the bucket), the bucket stays blocked. Alert on `QUARANTINED` and `MOVE` rows.
 - Within a job the buckets are read in priority order, each drained before the next. A failure stops only
   the bucket it happened in; the job's other buckets carry on.
 

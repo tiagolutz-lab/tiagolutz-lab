@@ -14,25 +14,35 @@ If the buckets use a customer-managed key, also allow the dynamic group and the
 Object Storage service to use that key.
 
 For ATP reading the buckets (resource principal), create a SEPARATE dynamic group that
-matches the Autonomous Database, and grant it list, read and DELETE on the same buckets.
-ATP deletes a file from the bucket once it has been loaded and committed. It never
-creates or overwrites objects.
+matches the Autonomous Database. ATP moves each file out of its source bucket (copy, then
+delete) into a shared ARCHIVE bucket after a successful load, or into a shared ERROR bucket
+when the file keeps failing. So it needs list, read and delete on the source buckets, and
+create (and overwrite, for retried copies) on the archive and error buckets.
 
 Dynamic group (matches the one Autonomous Database):
 
   ALL {resource.type = 'autonomousdatabase', resource.id = '<adb-ocid>'}
 
-Policy (add one target.bucket.name clause per bucket). Least privilege: list, read and
-delete only, no create:
+Policy (add one target.bucket.name clause per source bucket). Least privilege:
 
+  Source buckets: list, read, delete
   Allow dynamic-group <atp-dg> to manage objects in compartment <compartment-name>
     where all {any {target.bucket.name = '<bucket-a>', target.bucket.name = '<bucket-b>'},
                any {request.permission = 'OBJECT_INSPECT',
                     request.permission = 'OBJECT_READ',
                     request.permission = 'OBJECT_DELETE'}}
 
-If your admin team prefers the simpler form, 'manage objects' on the same buckets also
-works but additionally lets ATP create and overwrite objects.
+  Archive and error buckets: create, overwrite (list is needed to confirm)
+  Allow dynamic-group <atp-dg> to manage objects in compartment <compartment-name>
+    where all {any {target.bucket.name = '<archive-bucket>', target.bucket.name = '<error-bucket>'},
+               any {request.permission = 'OBJECT_INSPECT',
+                    request.permission = 'OBJECT_CREATE',
+                    request.permission = 'OBJECT_OVERWRITE'}}
+
+Keep the archive and error buckets in the same region as the source buckets. Confirm with the
+Oracle documentation which permissions a server-side copy (DBMS_CLOUD.COPY_OBJECT) needs on
+the source and the target, and adjust these two statements if it differs. If your admin team
+prefers the simpler form, 'manage objects' on the same buckets also works but is broader.
 
 If the tenancy uses identity domains, prefix the group with its domain in the policy, for
 example: Allow dynamic-group <identity-domain>/<atp-dg> to manage objects ...
