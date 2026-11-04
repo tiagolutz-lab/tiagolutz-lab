@@ -53,7 +53,7 @@ that old. The default `0` transfers immediately, so it can differ per server and
 ## ATP conventions and buckets
 
 - ATP reads the buckets with its own identity (resource principal), so no keys are stored. The OCI admin
-  team creates a dynamic group for the database and a read-only policy; the DBA then runs
+  team creates a dynamic group for the database and a policy allowing list, read and delete on the buckets; the DBA then runs
   `atp/00_connect_to_object_storage.sql`. Full steps are in section 8.1 of the spec.
 
 - Every custom ATP object starts with `AD_` (tables, sequence, package, scheduler job, constraints).
@@ -74,6 +74,10 @@ that old. The default `0` transfers immediately, so it can differ per server and
   changes. A bucket has one job only, so jobs never overlap on a bucket and its order holds. A `job_name`
   with no matching job means the bucket is never processed; `03_scheduler_job.sql` has a query to catch it.
 - `description` is free text: what the bucket holds and which interface it serves.
+- After a file is loaded and committed, ATP deletes it from the bucket. If the delete fails, the file is
+  already in `AD_FILE_LOG` so it is not loaded twice; the delete is retried at the start of the next run
+  and each failure is written to `AD_FILE_ERROR`. A file that fails to load stays in the bucket and blocks
+  that bucket (unchanged; error handling is still to be decided).
 - Within a job the buckets are read in priority order, each drained before the next. A failure stops only
   the bucket it happened in; the job's other buckets carry on.
 

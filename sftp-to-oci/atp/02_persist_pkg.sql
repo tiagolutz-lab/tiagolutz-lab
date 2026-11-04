@@ -7,6 +7,11 @@
 -- Loading: each bucket names its own loader in AD_BUCKET_CONFIG.LOAD_PROCEDURE, called
 -- dynamically for every file. The default, LOAD_DEFAULT, loads by file extension.
 --
+-- After a file is loaded and committed it is DELETED from the source bucket. If the delete
+-- fails, the file is already in AD_FILE_LOG so it is never loaded twice; the delete is
+-- retried at the start of every run for that bucket and each failure is written to
+-- AD_FILE_ERROR. A file that fails to LOAD stays in the bucket and blocks it (see below).
+--
 -- Order: oldest object (Object Storage creation time) first, ties broken by name.
 -- Each file is loaded and logged in ONE transaction, so a failure rolls back both
 -- and the same file is retried next run. A failure stops that bucket, so a newer
@@ -72,6 +77,34 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
     VALUES (p_bucket_uri, p_object, SUBSTR(p_err, 1, 4000));
     COMMIT;
   END log_failure;
+
+  -- ---- Delete a loaded file from the source bucket -----------------------------
+  -- Never raises: the file is already loaded and logged. A failure is recorded and the
+  -- delete is retried on the next run (see delete_loaded).
+  PROCEDURE delete_source (p_bucket_uri VARCHAR2, p_object VARCHAR2) IS
+  BEGIN
+    DBMS_CLOUD.DELETE_OBJECT(credential_name => c_cred,
+                             object_uri      => p_bucket_uri || p_object);
+  EXCEPTION
+    WHEN OTHERS THEN
+      log_failure(p_bucket_uri, p_object, 'DELETE FAILED (file already loaded): ' || SQLERRM);
+  END delete_source;
+
+  -- Retries deletes that failed earlier: objects still in the bucket that are already in
+  -- AD_FILE_LOG. The creation time must match, so a new file re-sent under the same name
+  -- is never deleted unloaded.
+  PROCEDURE delete_loaded (p_bucket_uri VARCHAR2) IS
+  BEGIN
+    FOR o IN (SELECT l.object_name
+              FROM   DBMS_CLOUD.LIST_OBJECTS(c_cred, p_bucket_uri) l
+              JOIN   ad_file_log f
+                ON   f.bucket_uri     = p_bucket_uri
+               AND   f.object_name    = l.object_name
+               AND   f.object_created = l.created)
+    LOOP
+      delete_source(p_bucket_uri, o.object_name);
+    END LOOP;
+  END delete_loaded;
 
   -- ---- CSV: stage, then filter on insert -------------------------------------
   PROCEDURE load_csv (p_uri VARCHAR2, p_file_id NUMBER, p_read OUT NUMBER, p_loaded OUT NUMBER) IS
@@ -166,7 +199,8 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
              FROM   DBMS_CLOUD.LIST_OBJECTS(c_cred, p_bucket_uri) o
              WHERE  NOT EXISTS (SELECT 1 FROM ad_file_log f
                                 WHERE f.bucket_uri = p_bucket_uri
-                                AND   f.object_name = o.object_name)
+                                AND   f.object_name = o.object_name
+                                AND   f.object_created = o.created)
              ORDER  BY o.created, o.object_name)
       WHERE  ROWNUM = 1;
     EXCEPTION
@@ -190,6 +224,7 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
     VALUES (l_file_id, p_bucket_uri, l_name, l_created, l_read, l_loaded);
 
     COMMIT;   -- rows + log entry together
+    delete_source(p_bucket_uri, l_name);   -- after the commit; a failure here is non-fatal
     RETURN TRUE;
   EXCEPTION
     WHEN OTHERS THEN
@@ -201,6 +236,7 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
   PROCEDURE process_all (p_bucket_uri IN VARCHAR2,
                          p_load_proc  IN VARCHAR2) IS
   BEGIN
+    delete_loaded(p_bucket_uri);   -- retry any earlier failed deletes first
     WHILE process_next(p_bucket_uri, p_load_proc) LOOP
       NULL;
     END LOOP;

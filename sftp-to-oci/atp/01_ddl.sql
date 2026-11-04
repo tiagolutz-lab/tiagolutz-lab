@@ -44,7 +44,8 @@ VALUES ('https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket-
         'Sample: orders CSV files from SFTP server 2', 'AD_PERSIST_FILES_B', 10,
         'AD_FILE_PERSIST_PKG.LOAD_DEFAULT', 'N');
 
--- Successfully processed files only. One row per bucket URI + object.
+-- Successfully processed files only. One row per bucket URI + object + creation time, so a
+-- later file re-sent under the same name (after the first was deleted) is a new file.
 -- A file appears here in the same transaction as its loaded rows.
 CREATE TABLE ad_file_log (
   file_id         NUMBER NOT NULL,
@@ -55,7 +56,7 @@ CREATE TABLE ad_file_log (
   rows_loaded     NUMBER,
   processed_at    TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
   CONSTRAINT ad_file_log_pk PRIMARY KEY (file_id),
-  CONSTRAINT ad_file_log_uq UNIQUE (bucket_uri, object_name)
+  CONSTRAINT ad_file_log_uq UNIQUE (bucket_uri, object_name, object_created)
 );
 
 -- Every failed attempt (append-only). Alert on new rows or repeated failures.

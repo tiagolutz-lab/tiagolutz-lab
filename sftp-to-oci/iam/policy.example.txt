@@ -14,21 +14,28 @@ If the buckets use a customer-managed key, also allow the dynamic group and the
 Object Storage service to use that key.
 
 For ATP reading the buckets (resource principal), create a SEPARATE dynamic group that
-matches the Autonomous Database, and grant it read-only access to the same buckets.
-ATP never writes to or deletes from the buckets.
+matches the Autonomous Database, and grant it list, read and DELETE on the same buckets.
+ATP deletes a file from the bucket once it has been loaded and committed. It never
+creates or overwrites objects.
 
 Dynamic group (matches the one Autonomous Database):
 
   ALL {resource.type = 'autonomousdatabase', resource.id = '<adb-ocid>'}
 
-Policy (add one target.bucket.name clause per bucket; 'read objects' covers listing and
-reading):
+Policy (add one target.bucket.name clause per bucket). Least privilege: list, read and
+delete only, no create:
 
-  Allow dynamic-group <atp-dg> to read objects in compartment <compartment-name>
-    where any {target.bucket.name = '<bucket-a>', target.bucket.name = '<bucket-b>'}
+  Allow dynamic-group <atp-dg> to manage objects in compartment <compartment-name>
+    where all {any {target.bucket.name = '<bucket-a>', target.bucket.name = '<bucket-b>'},
+               any {request.permission = 'OBJECT_INSPECT',
+                    request.permission = 'OBJECT_READ',
+                    request.permission = 'OBJECT_DELETE'}}
+
+If your admin team prefers the simpler form, 'manage objects' on the same buckets also
+works but additionally lets ATP create and overwrite objects.
 
 If the tenancy uses identity domains, prefix the group with its domain in the policy, for
-example: Allow dynamic-group <identity-domain>/<atp-dg> to read objects ...
+example: Allow dynamic-group <identity-domain>/<atp-dg> to manage objects ...
 
 Oracle caches the resource principal token for two hours, so a change to the dynamic group
 or policy can take up to two hours to take effect.
