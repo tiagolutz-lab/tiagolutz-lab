@@ -13,21 +13,27 @@ CREATE SEQUENCE ad_file_log_seq NOCACHE;
 -- so the endpoint is changed here, not in code.
 -- Buckets are read in PRIORITY order: the LOWEST number is read FIRST (1 before 2);
 -- equal priorities are read in bucket-name order.
+-- LOAD_PROCEDURE is the procedure that loads each file of that bucket (called
+-- dynamically). It must have the signature documented in AD_FILE_PERSIST_PKG
+-- (02_persist_pkg.sql). The default loads by file extension (csv / json / xml).
 CREATE TABLE ad_bucket_config (
   bucket_name  VARCHAR2(256)  NOT NULL,
   namespace    VARCHAR2(100)  NOT NULL,   -- Object Storage namespace of the tenancy
   base_url     VARCHAR2(500)  NOT NULL,   -- for example https://objectstorage.eu-dublin-1.oraclecloud.com
   priority     NUMBER         DEFAULT 100 NOT NULL,
+  load_procedure VARCHAR2(261) DEFAULT 'AD_FILE_PERSIST_PKG.LOAD_DEFAULT' NOT NULL,
   enabled      VARCHAR2(1)    DEFAULT 'Y' NOT NULL,
   CONSTRAINT ad_bucket_config_pk PRIMARY KEY (bucket_name),
   CONSTRAINT ad_bucket_config_ck CHECK (enabled IN ('Y', 'N'))
 );
 
 -- Sample rows are disabled so nothing runs until real values are entered.
-INSERT INTO ad_bucket_config (bucket_name, namespace, base_url, priority, enabled)
-VALUES ('<bucket-a>', '<namespace>', 'https://objectstorage.<region>.oraclecloud.com', 10, 'N');
-INSERT INTO ad_bucket_config (bucket_name, namespace, base_url, priority, enabled)
-VALUES ('<bucket-b>', '<namespace>', 'https://objectstorage.<region>.oraclecloud.com', 20, 'N');
+INSERT INTO ad_bucket_config (bucket_name, namespace, base_url, priority, load_procedure, enabled)
+VALUES ('<bucket-a>', '<namespace>', 'https://objectstorage.<region>.oraclecloud.com', 10,
+        'AD_FILE_PERSIST_PKG.LOAD_DEFAULT', 'N');
+INSERT INTO ad_bucket_config (bucket_name, namespace, base_url, priority, load_procedure, enabled)
+VALUES ('<bucket-b>', '<namespace>', 'https://objectstorage.<region>.oraclecloud.com', 20,
+        'AD_FILE_PERSIST_PKG.LOAD_DEFAULT', 'N');
 
 -- Successfully processed files only. One row per bucket + object.
 -- A file appears here in the same transaction as its loaded rows.

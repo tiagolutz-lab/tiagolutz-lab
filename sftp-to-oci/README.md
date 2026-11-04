@@ -63,6 +63,10 @@ that old. The default `0` transfers immediately, so it can differ per server and
 - The Object Storage endpoint is the `base_url` column (for example
   `https://objectstorage.eu-dublin-1.oraclecloud.com`), not code. The URI is built as
   `base_url/n/<namespace>/b/<bucket>/o/`.
+- `load_procedure` names the procedure that loads each file of that bucket; it is called dynamically, so a
+  new file format or target is a new procedure plus one table update. It must follow the contract at the top
+  of `AD_FILE_PERSIST_PKG` (file URI, object name, file id, credential in; rows read and loaded out; no
+  commit). The default, `AD_FILE_PERSIST_PKG.LOAD_DEFAULT`, loads CSV, JSON and XML by extension.
 - `priority` sets the read order: the lowest number is read first, ties go by bucket name.
 - One job reads the enabled buckets in priority order and processes them one after another, draining each
   before the next. A failure stops only the bucket it happened in; the others carry on.

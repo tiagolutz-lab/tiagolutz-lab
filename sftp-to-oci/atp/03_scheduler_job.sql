@@ -5,12 +5,16 @@
 -- running, so runs cannot overlap.
 --
 -- Buckets are not named here. To add one:
---   INSERT INTO ad_bucket_config (bucket_name, namespace, base_url, priority)
---   VALUES ('<bucket>', '<namespace>', 'https://objectstorage.<region>.oraclecloud.com', 10);
+--   INSERT INTO ad_bucket_config (bucket_name, namespace, base_url, priority, load_procedure)
+--   VALUES ('<bucket>', '<namespace>', 'https://objectstorage.<region>.oraclecloud.com', 10,
+--           'AD_FILE_PERSIST_PKG.LOAD_DEFAULT');
 --   COMMIT;
 -- To pause one: UPDATE ad_bucket_config SET enabled = 'N' WHERE bucket_name = '<bucket>';
 -- To change the read order: UPDATE ad_bucket_config SET priority = <n> WHERE bucket_name = '<bucket>';
 --   (lowest number is read first)
+-- To use a different loader for a bucket (it must follow the contract at the top of
+-- AD_FILE_PERSIST_PKG; no job or package change is needed):
+--   UPDATE ad_bucket_config SET load_procedure = 'AD_MY_LOADER_PKG.LOAD_ADS' WHERE bucket_name = '<bucket>';
 -- To change the endpoint: UPDATE ad_bucket_config SET base_url = '<url>' WHERE bucket_name = '<bucket>';
 --
 -- Buckets are processed one after another within a run, in priority order, and each
