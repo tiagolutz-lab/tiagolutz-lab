@@ -19,7 +19,7 @@ No credentials belong in this repository.
 | `atp/00_connect_to_object_storage.sql` | Admin script: enable the resource principal, grants, and connectivity checks for ATP |
 | `atp/01_ddl.sql` | `AD_BUCKET_CONFIG`, `AD_FILE_LOG`, `AD_FILE_ERROR`, `AD_FILTER_CONFIG`, staging and sample target tables |
 | `atp/02_persist_pkg.sql` | `AD_FILE_PERSIST_PKG`: ordered loader with CSV, JSON and XML filtering examples |
-| `atp/03_scheduler_job.sql` | Job `AD_PERSIST_FILES`: polls every enabled bucket in `AD_BUCKET_CONFIG` every 15 seconds |
+| `atp/03_scheduler_job.sql` | Jobs `AD_PERSIST_FILES_A` and `_B`: each polls its own buckets from `AD_BUCKET_CONFIG` every 15 seconds |
 | `tests/` | Stub-rclone behavioural tests for the ordering logic (`bash tests/test_ordering.sh`) |
 
 ## Ordering guarantees
@@ -58,7 +58,7 @@ that old. The default `0` transfers immediately, so it can differ per server and
 
 - Every custom ATP object starts with `AD_` (tables, sequence, package, scheduler job, constraints).
 - Buckets are not written into any code or job. They are rows in `AD_BUCKET_CONFIG`
-  (`bucket_uri`, `priority`, `load_procedure`, `enabled` `Y`/`N`). To add a bucket, insert a row; to pause
+  (`bucket_uri`, `description`, `job_name`, `priority`, `load_procedure`, `enabled` `Y`/`N`). To add a bucket, insert a row; to pause
   one, set `enabled = 'N'`. The sample rows are disabled until real values are entered.
 - `bucket_uri` is the full URI of the bucket, so the endpoint, namespace and bucket all live in the table:
   `https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket>/o/`. A missing trailing `/`
@@ -68,8 +68,14 @@ that old. The default `0` transfers immediately, so it can differ per server and
   of `AD_FILE_PERSIST_PKG` (file URI, object name, file id, credential in; rows read and loaded out; no
   commit). The default, `AD_FILE_PERSIST_PKG.LOAD_DEFAULT`, loads CSV, JSON and XML by extension.
 - `priority` sets the read order: the lowest number is read first, ties go by bucket name.
-- One job reads the enabled buckets in priority order and processes them one after another, draining each
-  before the next. A failure stops only the bucket it happened in; the others carry on.
+- `job_name` says which scheduler job processes the bucket. Each job passes its own name to
+  `process_all_buckets` and picks only the enabled rows carrying that name, so the work is split across jobs
+  in the table. For another job, copy a `CREATE_JOB` block with a new name and point buckets at it; no code
+  changes. A bucket has one job only, so jobs never overlap on a bucket and its order holds. A `job_name`
+  with no matching job means the bucket is never processed; `03_scheduler_job.sql` has a query to catch it.
+- `description` is free text: what the bucket holds and which interface it serves.
+- Within a job the buckets are read in priority order, each drained before the next. A failure stops only
+  the bucket it happened in; the job's other buckets carry on.
 
 ## Add a new SFTP server
 

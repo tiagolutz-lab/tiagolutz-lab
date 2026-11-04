@@ -51,10 +51,12 @@ CREATE OR REPLACE PACKAGE ad_file_persist_pkg AS
   PROCEDURE process_all (p_bucket_uri IN VARCHAR2,
                          p_load_proc  IN VARCHAR2);
 
-  -- Drains every enabled bucket in AD_BUCKET_CONFIG, lowest PRIORITY number first.
+  -- Drains the enabled buckets of AD_BUCKET_CONFIG whose JOB_NAME equals p_job_name,
+  -- lowest PRIORITY number first. Each scheduler job passes its own name, so adding a
+  -- job is a new job plus table updates, with no code change.
   -- A failure stops only that bucket (it is already recorded in AD_FILE_ERROR); the
-  -- others still run.
-  PROCEDURE process_all_buckets;
+  -- other buckets of the job still run.
+  PROCEDURE process_all_buckets (p_job_name IN VARCHAR2);
 END ad_file_persist_pkg;
 /
 
@@ -204,12 +206,13 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
     END LOOP;
   END process_all;
 
-  -- ---- All enabled buckets from AD_BUCKET_CONFIG -------------------------------
-  PROCEDURE process_all_buckets IS
+  -- ---- The enabled buckets assigned to one scheduler job ---------------------
+  PROCEDURE process_all_buckets (p_job_name IN VARCHAR2) IS
   BEGIN
     FOR b IN (SELECT bucket_uri, load_procedure
               FROM   ad_bucket_config
               WHERE  enabled = 'Y'
+              AND    job_name = p_job_name
               ORDER  BY priority, bucket_uri)
     LOOP
       BEGIN
@@ -218,7 +221,7 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
         process_all(RTRIM(b.bucket_uri, '/') || '/', b.load_procedure);
       EXCEPTION
         WHEN OTHERS THEN
-          NULL;   -- already recorded in AD_FILE_ERROR; ordering is per bucket, so carry on with the others
+          NULL;   -- already recorded in AD_FILE_ERROR; ordering is per bucket, so carry on with the job's other buckets
       END;
     END LOOP;
   END process_all_buckets;

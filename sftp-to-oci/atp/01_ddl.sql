@@ -17,8 +17,16 @@ CREATE SEQUENCE ad_file_log_seq NOCACHE;
 -- LOAD_PROCEDURE is the procedure that loads each file of that bucket (called
 -- dynamically). It must have the signature documented in AD_FILE_PERSIST_PKG
 -- (02_persist_pkg.sql). The default loads by file extension (csv / json / xml).
+-- JOB_NAME is the scheduler job that processes this bucket. Each job picks up only the
+-- rows carrying its own name, so the buckets are split across jobs here. A bucket
+-- belongs to exactly one job, so two jobs never work on the same bucket and the
+-- per-bucket order holds. Create the jobs in 03_scheduler_job.sql; a JOB_NAME with no
+-- matching job means the bucket is never processed.
+-- DESCRIPTION says what the bucket holds and which interface it serves.
 CREATE TABLE ad_bucket_config (
   bucket_uri      VARCHAR2(500) NOT NULL,
+  description     VARCHAR2(500),
+  job_name        VARCHAR2(128) DEFAULT 'AD_PERSIST_FILES_A' NOT NULL,
   priority        NUMBER        DEFAULT 100 NOT NULL,
   load_procedure  VARCHAR2(261) DEFAULT 'AD_FILE_PERSIST_PKG.LOAD_DEFAULT' NOT NULL,
   enabled         VARCHAR2(1)   DEFAULT 'Y' NOT NULL,
@@ -27,11 +35,13 @@ CREATE TABLE ad_bucket_config (
 );
 
 -- Sample rows are disabled so nothing runs until real values are entered.
-INSERT INTO ad_bucket_config (bucket_uri, priority, load_procedure, enabled)
-VALUES ('https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket-a>/o/', 10,
+INSERT INTO ad_bucket_config (bucket_uri, description, job_name, priority, load_procedure, enabled)
+VALUES ('https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket-a>/o/',
+        'Sample: ad_*.xml files from SFTP server 1', 'AD_PERSIST_FILES_A', 10,
         'AD_FILE_PERSIST_PKG.LOAD_DEFAULT', 'N');
-INSERT INTO ad_bucket_config (bucket_uri, priority, load_procedure, enabled)
-VALUES ('https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket-b>/o/', 20,
+INSERT INTO ad_bucket_config (bucket_uri, description, job_name, priority, load_procedure, enabled)
+VALUES ('https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket-b>/o/',
+        'Sample: orders CSV files from SFTP server 2', 'AD_PERSIST_FILES_B', 10,
         'AD_FILE_PERSIST_PKG.LOAD_DEFAULT', 'N');
 
 -- Successfully processed files only. One row per bucket URI + object.
