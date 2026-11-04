@@ -8,8 +8,11 @@
 --
 -- PREREQUISITE (OCI admin team, see ../iam/policy.example.txt):
 --   a dynamic group matching this Autonomous Database, and a policy letting that
---   group read objects in the target buckets. Policy changes can take a few
---   minutes to apply.
+--   group read objects in the target buckets. Oracle caches the resource principal
+--   token for two hours, so a change to the dynamic group or policy can take up to
+--   two hours to take effect. If the tenancy uses identity domains, the policy must
+--   name the group as <identity_domain_name>/<dynamic-group-name>.
+--   Written for Autonomous AI Database 26ai (the renamed Autonomous Database 23ai).
 -- =============================================================================
 
 -- 1. Enable the resource principal for the schema.
@@ -43,7 +46,7 @@ FROM   DBMS_CLOUD.LIST_OBJECTS(
 -- refused. If it succeeds, the policy is broader than intended.
 
 -- Common errors
---   ORA-20401 authorization failed / 404: policy not applied yet, dynamic group rule does
+--   ORA-20401 authorization failed / 404: policy not applied yet (up to two hours), dynamic group rule does
 --             not match this database, or the bucket name is not in the policy.
 --   ORA-20404 object not found: wrong region, namespace or bucket in the URI, or the
 --             URI does not end with /o/.

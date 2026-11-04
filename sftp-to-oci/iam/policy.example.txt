@@ -27,5 +27,11 @@ reading):
   Allow dynamic-group <atp-dg> to read objects in compartment <compartment-name>
     where any {target.bucket.name = '<bucket-a>', target.bucket.name = '<bucket-b>'}
 
+If the tenancy uses identity domains, prefix the group with its domain in the policy, for
+example: Allow dynamic-group <identity-domain>/<atp-dg> to read objects ...
+
+Oracle caches the resource principal token for two hours, so a change to the dynamic group
+or policy can take up to two hours to take effect.
+
 Then run atp/00_connect_to_object_storage.sql on the database. Use one dynamic group per
 environment (test, production) so a test database cannot read production buckets.
