@@ -16,6 +16,7 @@ No credentials belong in this repository.
 | `config/rclone.conf.example` | One rclone remote per SFTP server, plus the OCI remote |
 | `config/server1-bucket-a.env.example` | Per-pair settings consumed by the unit |
 | `iam/policy.example.txt` | Dynamic group and policy statements for the VM and for ATP |
+| `atp/00_connect_to_object_storage.sql` | Admin script: enable the resource principal, grants, and connectivity checks for ATP |
 | `atp/01_ddl.sql` | `AD_BUCKET_CONFIG`, `AD_FILE_LOG`, `AD_FILE_ERROR`, `AD_FILTER_CONFIG`, staging and sample target tables |
 | `atp/02_persist_pkg.sql` | `AD_FILE_PERSIST_PKG`: ordered loader with CSV, JSON and XML filtering examples |
 | `atp/03_scheduler_job.sql` | Job `AD_PERSIST_FILES`: polls every enabled bucket in `AD_BUCKET_CONFIG` every 15 seconds |
@@ -50,6 +51,10 @@ that old. The default `0` transfers immediately, so it can differ per server and
   wait longer than intended.
 
 ## ATP conventions and buckets
+
+- ATP reads the buckets with its own identity (resource principal), so no keys are stored. The OCI admin
+  team creates a dynamic group for the database and a read-only policy; the DBA then runs
+  `atp/00_connect_to_object_storage.sql`. Full steps are in section 8.1 of the spec.
 
 - Every custom ATP object starts with `AD_` (tables, sequence, package, scheduler job, constraints).
 - Buckets are not written into any code or job. They are rows in `AD_BUCKET_CONFIG`

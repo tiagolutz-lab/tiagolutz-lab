@@ -13,8 +13,19 @@ Policy (replace the placeholders; add one target.bucket.name clause per bucket):
 If the buckets use a customer-managed key, also allow the dynamic group and the
 Object Storage service to use that key.
 
-For ATP reading the buckets (resource principal), add the Autonomous Database to a
-separate dynamic group and grant it read access to the same buckets:
+For ATP reading the buckets (resource principal), create a SEPARATE dynamic group that
+matches the Autonomous Database, and grant it read-only access to the same buckets.
+ATP never writes to or deletes from the buckets.
+
+Dynamic group (matches the one Autonomous Database):
+
+  ALL {resource.type = 'autonomousdatabase', resource.id = '<adb-ocid>'}
+
+Policy (add one target.bucket.name clause per bucket; 'read objects' covers listing and
+reading):
 
   Allow dynamic-group <atp-dg> to read objects in compartment <compartment-name>
     where any {target.bucket.name = '<bucket-a>', target.bucket.name = '<bucket-b>'}
+
+Then run atp/00_connect_to_object_storage.sql on the database. Use one dynamic group per
+environment (test, production) so a test database cannot read production buckets.
