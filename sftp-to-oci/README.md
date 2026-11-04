@@ -21,6 +21,8 @@ No credentials belong in this repository.
 | `atp/02_persist_pkg.sql` | `AD_FILE_PERSIST_PKG`: ordered loader with CSV, JSON and XML filtering examples |
 | `atp/03_scheduler_job.sql` | Jobs `AD_PERSIST_FILES_A` and `_B`: each polls its own buckets from `AD_BUCKET_CONFIG` every 15 seconds |
 | `atp/04_upload_csv_blob.sql` | `AD_UPLOAD_CSV_BLOB`: uploads a CSV held as a BLOB into a bucket (`DBMS_CLOUD.PUT_OBJECT`), with an example; for feeding test files or publishing generated CSVs. Needs create permission on the target bucket |
+| `atp/05_json_to_csv_example.sql` | Example: flatten nested JSON (objects and lists inside lists) with `JSON_TABLE` `NESTED PATH`, load it or export it as CSV. Untested against a database |
+| `examples/json-to-csv/` | Sample nested JSON, a jq filter that flattens it, and the CSV it produces (checked with jq) |
 | `tests/` | Stub-rclone behavioural tests for the ordering logic (`bash tests/test_ordering.sh`) |
 
 ## Ordering guarantees

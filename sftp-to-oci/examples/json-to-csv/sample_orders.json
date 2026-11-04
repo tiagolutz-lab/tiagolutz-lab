@@ -1,0 +1,31 @@
+{
+  "batch": {
+    "id": "B-1001",
+    "created": "2026-11-04T09:00:00Z",
+    "source": { "system": "ERP", "region": "EU" }
+  },
+  "orders": [
+    {
+      "orderId": "O-1",
+      "status": "OPEN",
+      "customer": { "id": "C-10", "name": "Acme Ltd", "address": { "city": "Cork", "country": "IE" } },
+      "items": [
+        { "sku": "A-100", "qty": 2, "price": 10.5,
+          "discounts": [ { "code": "WELCOME", "pct": 10 }, { "code": "BULK", "pct": 5 } ] },
+        { "sku": "B-200", "qty": 1, "price": 99.0, "discounts": [] }
+      ]
+    },
+    {
+      "orderId": "O-2",
+      "status": "CLOSED",
+      "customer": { "id": "C-11", "name": "Beta GmbH", "address": { "city": "Berlin", "country": "DE" } },
+      "items": [ { "sku": "C-300", "qty": 5, "price": 3.2 } ]
+    },
+    {
+      "orderId": "O-3",
+      "status": "OPEN",
+      "customer": { "id": "C-12", "name": "Gamma, SA \"Lyon\"", "address": { "city": "Lyon", "country": "FR" } },
+      "items": []
+    }
+  ]
+}
