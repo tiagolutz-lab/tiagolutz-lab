@@ -12,7 +12,7 @@ setup() {                       # fresh sandbox per test
   export LOG_DIR="$T/log" LOCK_DIR="$T/lock" STATE_DIR="$T/state" RCLONE_CONF=/dev/null
   mkdir -p "$FAKE_SFTP/in" "$FAKE_OCI" "$T/bin" "$LOCK_DIR"
   cp "$HERE/rclone-stub.sh" "$T/bin/rclone"; chmod +x "$T/bin/rclone"
-  unset FAKE_FAIL FAKE_HOOK RCLONE_MODE ORDER_KEY
+  unset FAKE_FAIL FAKE_HOOK RCLONE_MODE
 }
 mk() { : > "$FAKE_SFTP/in/$1"; touch -d "2026-11-04 10:00:$2" "$FAKE_SFTP/in/$1"; }   # name, seconds
 order() { [ -f "$FAKE_OCI/order.log" ] && paste -sd' ' "$FAKE_OCI/order.log" || echo "(none)"; }
@@ -69,16 +69,11 @@ RCLONE_MODE=copy run
 check "copy mode: ordered and terminates" "ad_a.xml ad_b.xml ad_c.xml" "$(order)"
 check "copy mode: sources kept" "ad_a.xml ad_b.xml ad_c.xml" "$(ls "$FAKE_SFTP/in" | paste -sd' ')"
 
-# 6. ORDER_KEY=name sorts by file name, ignoring modified time
+# 6. File names never override timestamps (names sort opposite to modified time)
 setup
-mk ad_0003.xml 01; mk ad_0001.xml 09; mk ad_0002.xml 05
-ORDER_KEY=name run
-check "name ordering ignores mtime" "ad_0001.xml ad_0002.xml ad_0003.xml" "$(order)"
-
-# 7. Bad ORDER_KEY is rejected
-setup
-ORDER_KEY=bogus run; rc=$?
-check "invalid ORDER_KEY exits 2" "2" "$rc"
+mk ad_0001.xml 09; mk ad_0002.xml 05; mk ad_0003.xml 01
+run
+check "timestamp wins over name order" "ad_0003.xml ad_0002.xml ad_0001.xml" "$(order)"
 
 echo; echo "passed: $pass  failed: $fail"
 [ "$fail" -eq 0 ]

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # transfer.sh - move files from one SFTP folder to one OCI Object Storage bucket,
-# strictly oldest-first, one file at a time, stopping at the first failure.
+# strictly oldest-first by SFTP modified time, one file at a time, stopping at the
+# first failure.
 #
 # Usage:
 #   transfer.sh <rclone_remote> <sftp_folder> <file_pattern> <bucket> [interval_seconds]
@@ -8,30 +9,26 @@
 # Example:
 #   transfer.sh sftp-server1 /outbound/a 'ad_*.xml' bucket-a 15
 #
-# Ordering guarantees
+# Ordering
+#   * The order key is the file's modified time on the SFTP server. File names are NOT
+#     used for ordering. SFTP records no arrival time, so this equals arrival order only
+#     if the sender sets the time when the file is written and does not preserve the
+#     source file's original timestamp. Verify this with the sender.
+#   * SFTP timestamps have one-second precision. Files sharing the same second have no
+#     real order; they are processed in name order purely so the result is deterministic.
 #   * The folder is listed again before EVERY file, and the oldest remaining file is
-#     picked each time. A file that arrives mid-run with an older key is therefore
+#     picked each time. A file that arrives mid-run with an older timestamp is therefore
 #     picked next, not after the whole batch.
 #   * One file at a time; the next starts only after the previous one is uploaded
 #     (and, in move mode, deleted from SFTP).
 #   * A failed file stops the cycle. The next cycle retries that same file first.
-#   * In move mode a high-water mark records the newest key already transferred. If a
-#     file later shows up with an OLDER key (it arrived late, or the sender preserved an
-#     old timestamp), the script logs ORDER_VIOLATION so it can be alerted on. The
-#     file is still transferred: blocking forever would stall the pair.
-#
-# What "oldest" means (ORDER_KEY)
-#   mtime (default)  modified time on the SFTP server, one-second precision, ties broken
-#                    by name. SFTP records no arrival time. This is only arrival order if
-#                    the sender sets the time when the file is written and does not
-#                    preserve the source file's original timestamp.
-#   name             sort by file name. Use when names carry a zero-padded sequence number
-#                    or an ISO timestamp (for example ad_20261104T091500_0001.xml). This is
-#                    the most reliable key when the sender can provide one.
+#   * In move mode a high-water mark records the newest timestamp already transferred.
+#     If a file later shows up with an OLDER timestamp (it arrived late, or the sender
+#     preserved an old timestamp), the script logs ORDER_VIOLATION so it can be alerted
+#     on. The file is still transferred: blocking forever would stall the pair.
 #
 # Environment (all optional):
 #   RCLONE_MODE   move (default) or copy. Use copy during the parallel-run phase.
-#   ORDER_KEY     mtime (default) or name
 #   PAIR_ID       unique name for this pair; used for lock, log and state file names
 #   RCLONE_CONF   path to rclone.conf (default /etc/rclone/rclone.conf)
 #   LOG_DIR       log directory (default /var/log/rclone)
@@ -49,7 +46,6 @@ BUCKET="${4:?bucket}"
 INTERVAL="${5:-0}"
 
 MODE="${RCLONE_MODE:-move}"
-ORDER_KEY="${ORDER_KEY:-mtime}"
 ID="${PAIR_ID:-${REMOTE}-${BUCKET}}"
 RCLONE_CONF="${RCLONE_CONF:-/etc/rclone/rclone.conf}"
 LOG_DIR="${LOG_DIR:-/var/log/rclone}"
@@ -59,10 +55,6 @@ STATE_DIR="${STATE_DIR:-/var/lib/sftp2oci}"
 case "$MODE" in
   move|copy) ;;
   *) echo "RCLONE_MODE must be move or copy, got: $MODE" >&2; exit 2 ;;
-esac
-case "$ORDER_KEY" in
-  mtime|name) ;;
-  *) echo "ORDER_KEY must be mtime or name, got: $ORDER_KEY" >&2; exit 2 ;;
 esac
 
 mkdir -p "$LOG_DIR"
@@ -84,8 +76,8 @@ if [ "$MODE" = move ]; then
   fi
 fi
 
-# Key used for ordering, from a "modtime|name" line.
-key_of() { if [ "$ORDER_KEY" = name ]; then printf '%s' "${1#*|}"; else printf '%s' "${1%%|*}"; fi; }
+# Modified time from a "modtime|name" line.
+mtime_of() { printf '%s' "${1%%|*}"; }
 
 # Prints the next file as "modtime|name" (oldest first, skipping names already handled
 # in this cycle), or nothing when there is none. Non-zero if the listing fails.
@@ -98,11 +90,8 @@ next_file() {
       --format "tp" --separator "|") || return 1
   [ -z "$list" ] && return 0
 
-  if [ "$ORDER_KEY" = name ]; then
-    sorted=$(sort -t'|' -k2 <<< "$list")
-  else
-    sorted=$(sort -t'|' -k1,1 -k2 <<< "$list")
-  fi
+  # Oldest first. Name is only a tie-break for identical one-second timestamps.
+  sorted=$(sort -t'|' -k1,1 -k2 <<< "$list")
 
   while IFS= read -r line; do
     n="${line#*|}"
@@ -112,21 +101,21 @@ next_file() {
   done <<< "$sorted"
 }
 
-# Flag a file whose key is older than one already transferred.
+# Flag a file whose timestamp is older than one already transferred.
 check_late() {
   [ -n "$HWM_FILE" ] && [ -s "$HWM_FILE" ] || return 0
   local hwm; hwm=$(<"$HWM_FILE")
-  if [[ "$(key_of "$1")" < "$(key_of "$hwm")" ]]; then
-    log "ORDER_VIOLATION '${1#*|}' (${ORDER_KEY} $(key_of "$1")) is older than the last transferred '${hwm#*|}' (${ORDER_KEY} $(key_of "$hwm")); it arrived late. Transferring anyway."
+  if [[ "$(mtime_of "$1")" < "$(mtime_of "$hwm")" ]]; then
+    log "ORDER_VIOLATION '${1#*|}' (modtime $(mtime_of "$1")) is older than the last transferred '${hwm#*|}' (modtime $(mtime_of "$hwm")); it arrived late. Transferring anyway."
   fi
 }
 
-# Keep the highest key transferred so far.
+# Keep the newest timestamp transferred so far.
 record_hwm() {
   [ -n "$HWM_FILE" ] || return 0
   local cur=""
   [ -s "$HWM_FILE" ] && cur=$(<"$HWM_FILE")
-  if [ -z "$cur" ] || ! [[ "$(key_of "$1")" < "$(key_of "$cur")" ]]; then
+  if [ -z "$cur" ] || ! [[ "$(mtime_of "$1")" < "$(mtime_of "$cur")" ]]; then
     printf '%s\n' "$1" > "$HWM_FILE"
   fi
 }
