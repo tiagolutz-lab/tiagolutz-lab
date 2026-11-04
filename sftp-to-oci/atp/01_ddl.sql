@@ -9,50 +9,49 @@ CREATE SEQUENCE ad_file_log_seq NOCACHE;
 
 -- Buckets to poll. Add a row to start processing a bucket; no code or job change.
 -- Set ENABLED = 'N' to pause a bucket without deleting it.
--- The object URI is built as: BASE_URL || '/n/' || NAMESPACE || '/b/' || BUCKET_NAME || '/o/'
--- so the endpoint is changed here, not in code.
+-- BUCKET_URI is the full URI of the bucket, in this form (a trailing / is added if missing):
+--   https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket>/o/
+-- so the endpoint, namespace and bucket are all changed here, not in code.
 -- Buckets are read in PRIORITY order: the LOWEST number is read FIRST (1 before 2);
--- equal priorities are read in bucket-name order.
+-- equal priorities are read in bucket URI order.
 -- LOAD_PROCEDURE is the procedure that loads each file of that bucket (called
 -- dynamically). It must have the signature documented in AD_FILE_PERSIST_PKG
 -- (02_persist_pkg.sql). The default loads by file extension (csv / json / xml).
 CREATE TABLE ad_bucket_config (
-  bucket_name  VARCHAR2(256)  NOT NULL,
-  namespace    VARCHAR2(100)  NOT NULL,   -- Object Storage namespace of the tenancy
-  base_url     VARCHAR2(500)  NOT NULL,   -- for example https://objectstorage.eu-dublin-1.oraclecloud.com
-  priority     NUMBER         DEFAULT 100 NOT NULL,
-  load_procedure VARCHAR2(261) DEFAULT 'AD_FILE_PERSIST_PKG.LOAD_DEFAULT' NOT NULL,
-  enabled      VARCHAR2(1)    DEFAULT 'Y' NOT NULL,
-  CONSTRAINT ad_bucket_config_pk PRIMARY KEY (bucket_name),
+  bucket_uri      VARCHAR2(500) NOT NULL,
+  priority        NUMBER        DEFAULT 100 NOT NULL,
+  load_procedure  VARCHAR2(261) DEFAULT 'AD_FILE_PERSIST_PKG.LOAD_DEFAULT' NOT NULL,
+  enabled         VARCHAR2(1)   DEFAULT 'Y' NOT NULL,
+  CONSTRAINT ad_bucket_config_pk PRIMARY KEY (bucket_uri),
   CONSTRAINT ad_bucket_config_ck CHECK (enabled IN ('Y', 'N'))
 );
 
 -- Sample rows are disabled so nothing runs until real values are entered.
-INSERT INTO ad_bucket_config (bucket_name, namespace, base_url, priority, load_procedure, enabled)
-VALUES ('<bucket-a>', '<namespace>', 'https://objectstorage.<region>.oraclecloud.com', 10,
+INSERT INTO ad_bucket_config (bucket_uri, priority, load_procedure, enabled)
+VALUES ('https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket-a>/o/', 10,
         'AD_FILE_PERSIST_PKG.LOAD_DEFAULT', 'N');
-INSERT INTO ad_bucket_config (bucket_name, namespace, base_url, priority, load_procedure, enabled)
-VALUES ('<bucket-b>', '<namespace>', 'https://objectstorage.<region>.oraclecloud.com', 20,
+INSERT INTO ad_bucket_config (bucket_uri, priority, load_procedure, enabled)
+VALUES ('https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket-b>/o/', 20,
         'AD_FILE_PERSIST_PKG.LOAD_DEFAULT', 'N');
 
--- Successfully processed files only. One row per bucket + object.
+-- Successfully processed files only. One row per bucket URI + object.
 -- A file appears here in the same transaction as its loaded rows.
 CREATE TABLE ad_file_log (
   file_id         NUMBER NOT NULL,
-  bucket_name     VARCHAR2(256)  NOT NULL,
+  bucket_uri      VARCHAR2(500)  NOT NULL,
   object_name     VARCHAR2(1024) NOT NULL,
   object_created  TIMESTAMP WITH TIME ZONE,
   rows_read       NUMBER,
   rows_loaded     NUMBER,
   processed_at    TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
   CONSTRAINT ad_file_log_pk PRIMARY KEY (file_id),
-  CONSTRAINT ad_file_log_uq UNIQUE (bucket_name, object_name)
+  CONSTRAINT ad_file_log_uq UNIQUE (bucket_uri, object_name)
 );
 
 -- Every failed attempt (append-only). Alert on new rows or repeated failures.
 CREATE TABLE ad_file_error (
   error_id     NUMBER GENERATED ALWAYS AS IDENTITY,
-  bucket_name  VARCHAR2(256)  NOT NULL,
+  bucket_uri   VARCHAR2(500)  NOT NULL,
   object_name  VARCHAR2(1024),
   failed_at    TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
   error_text   VARCHAR2(4000),

@@ -58,11 +58,11 @@ that old. The default `0` transfers immediately, so it can differ per server and
 
 - Every custom ATP object starts with `AD_` (tables, sequence, package, scheduler job, constraints).
 - Buckets are not written into any code or job. They are rows in `AD_BUCKET_CONFIG`
-  (bucket name, namespace, base URL, priority, enabled `Y`/`N`). To add a bucket, insert a row; to pause
+  (`bucket_uri`, `priority`, `load_procedure`, `enabled` `Y`/`N`). To add a bucket, insert a row; to pause
   one, set `enabled = 'N'`. The sample rows are disabled until real values are entered.
-- The Object Storage endpoint is the `base_url` column (for example
-  `https://objectstorage.eu-dublin-1.oraclecloud.com`), not code. The URI is built as
-  `base_url/n/<namespace>/b/<bucket>/o/`.
+- `bucket_uri` is the full URI of the bucket, so the endpoint, namespace and bucket all live in the table:
+  `https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket>/o/`. A missing trailing `/`
+  is added. `AD_FILE_LOG` and `AD_FILE_ERROR` record the bucket by this URI.
 - `load_procedure` names the procedure that loads each file of that bucket; it is called dynamically, so a
   new file format or target is a new procedure plus one table update. It must follow the contract at the top
   of `AD_FILE_PERSIST_PKG` (file URI, object name, file id, credential in; rows read and loaded out; no

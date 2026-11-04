@@ -44,13 +44,11 @@ CREATE OR REPLACE PACKAGE ad_file_persist_pkg AS
                           p_rows_loaded OUT NUMBER);
 
   -- Processes at most ONE file per call. Returns TRUE if a file was processed.
-  FUNCTION process_next (p_bucket_uri  IN VARCHAR2,   -- .../n/<ns>/b/<bucket>/o/
-                         p_bucket      IN VARCHAR2,
+  FUNCTION process_next (p_bucket_uri  IN VARCHAR2,   -- full bucket URI, ends with /o/
                          p_load_proc   IN VARCHAR2) RETURN BOOLEAN;  -- loader for this bucket
 
   -- Drains one bucket in order; stops (raises) on the first failure.
   PROCEDURE process_all (p_bucket_uri IN VARCHAR2,
-                         p_bucket     IN VARCHAR2,
                          p_load_proc  IN VARCHAR2);
 
   -- Drains every enabled bucket in AD_BUCKET_CONFIG, lowest PRIORITY number first.
@@ -64,18 +62,12 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
 
   c_cred CONSTANT VARCHAR2(30) := 'OCI$RESOURCE_PRINCIPAL';
 
-  -- The endpoint comes from AD_BUCKET_CONFIG.BASE_URL; nothing is hard-coded here.
-  FUNCTION bucket_uri (p_bucket VARCHAR2, p_namespace VARCHAR2, p_base_url VARCHAR2) RETURN VARCHAR2 IS
-  BEGIN
-    RETURN RTRIM(p_base_url, '/') || '/n/' || p_namespace || '/b/' || p_bucket || '/o/';
-  END bucket_uri;
-
   -- Autonomous, so the failure record survives the rollback of the file's load.
-  PROCEDURE log_failure (p_bucket VARCHAR2, p_object VARCHAR2, p_err VARCHAR2) IS
+  PROCEDURE log_failure (p_bucket_uri VARCHAR2, p_object VARCHAR2, p_err VARCHAR2) IS
     PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
-    INSERT INTO ad_file_error (bucket_name, object_name, error_text)
-    VALUES (p_bucket, p_object, SUBSTR(p_err, 1, 4000));
+    INSERT INTO ad_file_error (bucket_uri, object_name, error_text)
+    VALUES (p_bucket_uri, p_object, SUBSTR(p_err, 1, 4000));
     COMMIT;
   END log_failure;
 
@@ -155,7 +147,7 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
   END load_default;
 
   -- ---- One file: pick the oldest unprocessed object in a bucket --------------
-  FUNCTION process_next (p_bucket_uri IN VARCHAR2, p_bucket IN VARCHAR2,
+  FUNCTION process_next (p_bucket_uri IN VARCHAR2,
                          p_load_proc  IN VARCHAR2) RETURN BOOLEAN IS
     l_name    VARCHAR2(1024);
     l_created TIMESTAMP WITH TIME ZONE;
@@ -171,7 +163,7 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
       FROM  (SELECT o.object_name, o.created
              FROM   DBMS_CLOUD.LIST_OBJECTS(c_cred, p_bucket_uri) o
              WHERE  NOT EXISTS (SELECT 1 FROM ad_file_log f
-                                WHERE f.bucket_name = p_bucket
+                                WHERE f.bucket_uri = p_bucket_uri
                                 AND   f.object_name = o.object_name)
              ORDER  BY o.created, o.object_name)
       WHERE  ROWNUM = 1;
@@ -192,22 +184,22 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
     EXECUTE IMMEDIATE 'BEGIN ' || l_proc || '(:1, :2, :3, :4, :5, :6); END;'
       USING IN l_uri, IN l_name, IN l_file_id, IN c_cred, OUT l_read, OUT l_loaded;
 
-    INSERT INTO ad_file_log (file_id, bucket_name, object_name, object_created, rows_read, rows_loaded)
-    VALUES (l_file_id, p_bucket, l_name, l_created, l_read, l_loaded);
+    INSERT INTO ad_file_log (file_id, bucket_uri, object_name, object_created, rows_read, rows_loaded)
+    VALUES (l_file_id, p_bucket_uri, l_name, l_created, l_read, l_loaded);
 
     COMMIT;   -- rows + log entry together
     RETURN TRUE;
   EXCEPTION
     WHEN OTHERS THEN
       ROLLBACK;
-      log_failure(p_bucket, l_name, SQLERRM);
+      log_failure(p_bucket_uri, l_name, SQLERRM);
       RAISE;   -- stop this bucket so the order is preserved
   END process_next;
 
-  PROCEDURE process_all (p_bucket_uri IN VARCHAR2, p_bucket IN VARCHAR2,
+  PROCEDURE process_all (p_bucket_uri IN VARCHAR2,
                          p_load_proc  IN VARCHAR2) IS
   BEGIN
-    WHILE process_next(p_bucket_uri, p_bucket, p_load_proc) LOOP
+    WHILE process_next(p_bucket_uri, p_load_proc) LOOP
       NULL;
     END LOOP;
   END process_all;
@@ -215,14 +207,15 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
   -- ---- All enabled buckets from AD_BUCKET_CONFIG -------------------------------
   PROCEDURE process_all_buckets IS
   BEGIN
-    FOR b IN (SELECT bucket_name, namespace, base_url, load_procedure
+    FOR b IN (SELECT bucket_uri, load_procedure
               FROM   ad_bucket_config
               WHERE  enabled = 'Y'
-              ORDER  BY priority, bucket_name)
+              ORDER  BY priority, bucket_uri)
     LOOP
       BEGIN
-        process_all(bucket_uri(b.bucket_name, b.namespace, b.base_url), b.bucket_name,
-                    b.load_procedure);
+        -- RTRIM + '/' so the URI always ends in exactly one slash, because the object
+        -- name is appended to it.
+        process_all(RTRIM(b.bucket_uri, '/') || '/', b.load_procedure);
       EXCEPTION
         WHEN OTHERS THEN
           NULL;   -- already recorded in AD_FILE_ERROR; ordering is per bucket, so carry on with the others
