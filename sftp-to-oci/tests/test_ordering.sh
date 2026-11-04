@@ -12,9 +12,10 @@ setup() {                       # fresh sandbox per test
   export LOG_DIR="$T/log" LOCK_DIR="$T/lock" STATE_DIR="$T/state" RCLONE_CONF=/dev/null
   mkdir -p "$FAKE_SFTP/in" "$FAKE_OCI" "$T/bin" "$LOCK_DIR"
   cp "$HERE/rclone-stub.sh" "$T/bin/rclone"; chmod +x "$T/bin/rclone"
-  unset FAKE_FAIL FAKE_HOOK RCLONE_MODE
+  unset FAKE_FAIL FAKE_HOOK RCLONE_MODE MIN_AGE_SECONDS
 }
 mk() { : > "$FAKE_SFTP/in/$1"; touch -d "2026-11-04 10:00:$2" "$FAKE_SFTP/in/$1"; }   # name, seconds
+mk_age() { : > "$FAKE_SFTP/in/$1"; touch -d "now - $2 seconds" "$FAKE_SFTP/in/$1"; }   # name, age in seconds
 order() { [ -f "$FAKE_OCI/order.log" ] && paste -sd' ' "$FAKE_OCI/order.log" || echo "(none)"; }
 run() { PAIR_ID=t timeout 30 bash "$SCRIPT" srv /in 'ad_*.xml' bkt 0 >"$T/out.txt" 2>&1; }
 check() {                        # description, expected, actual
@@ -74,6 +75,40 @@ setup
 mk ad_0001.xml 09; mk ad_0002.xml 05; mk ad_0003.xml 01
 run
 check "timestamp wins over name order" "ad_0003.xml ad_0002.xml ad_0001.xml" "$(order)"
+
+# 7. Minimum age: old enough files move in order, too-young file stays
+setup
+mk_age ad_a.xml 120; mk_age ad_b.xml 60; mk_age ad_c.xml 5
+MIN_AGE_SECONDS=30 run
+check "min age: old enough files moved in order" "ad_a.xml ad_b.xml" "$(order)"
+check "min age: young file left on SFTP" "ad_c.xml" "$(ls "$FAKE_SFTP/in" | paste -sd' ')"
+
+# 8. Minimum age: if the oldest file is too young nothing moves (order kept), and it is not an error
+setup
+mk_age ad_a.xml 5
+MIN_AGE_SECONDS=30 run; rc=$?
+check "min age: nothing moves while oldest is too young" "(none)" "$(order)"
+check "min age: waiting is not a failure" "0" "$rc"
+
+# 9. Default (0) transfers a brand new file immediately
+setup
+mk_age ad_a.xml 0
+run
+check "no min age: fresh file moves at once" "ad_a.xml" "$(order)"
+
+# 10. A waiting file is picked up once it has aged enough
+setup
+mk_age ad_a.xml 0
+MIN_AGE_SECONDS=2 run
+check "min age: file waits first" "(none)" "$(order)"
+sleep 3
+MIN_AGE_SECONDS=2 run
+check "min age: file moves after reaching age" "ad_a.xml" "$(order)"
+
+# 11. Invalid MIN_AGE_SECONDS is rejected
+setup
+MIN_AGE_SECONDS=abc run; rc=$?
+check "invalid MIN_AGE_SECONDS exits 2" "2" "$rc"
 
 echo; echo "passed: $pass  failed: $fail"
 [ "$fail" -eq 0 ]

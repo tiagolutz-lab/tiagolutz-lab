@@ -21,6 +21,13 @@
 #   * One file at a time; the next starts only after the previous one is uploaded
 #     (and, in move mode, deleted from SFTP).
 #   * A failed file stops the cycle. The next cycle retries that same file first.
+#   * Optional minimum age (MIN_AGE_SECONDS): a file is only transferred once its modified
+#     time is at least that many seconds in the past. Files are processed oldest-first, so
+#     if the oldest file is too young every other file is younger still; the cycle simply
+#     ends and the file is picked up in the first cycle after it reaches the required age.
+#     Order is never broken by waiting. A file still being written keeps a fresh modified
+#     time, so this also acts as a "no writes in the last N seconds" check. Age is measured
+#     against this VM's clock: keep it on NTP.
 #   * In move mode a high-water mark records the newest timestamp already transferred.
 #     If a file later shows up with an OLDER timestamp (it arrived late, or the sender
 #     preserved an old timestamp), the script logs ORDER_VIOLATION so it can be alerted
@@ -28,6 +35,7 @@
 #
 # Environment (all optional):
 #   RCLONE_MODE   move (default) or copy. Use copy during the parallel-run phase.
+#   MIN_AGE_SECONDS  minimum file age before transfer (default 0 = transfer immediately)
 #   PAIR_ID       unique name for this pair; used for lock, log and state file names
 #   RCLONE_CONF   path to rclone.conf (default /etc/rclone/rclone.conf)
 #   LOG_DIR       log directory (default /var/log/rclone)
@@ -45,6 +53,7 @@ BUCKET="${4:?bucket}"
 INTERVAL="${5:-0}"
 
 MODE="${RCLONE_MODE:-move}"
+MIN_AGE_SECONDS="${MIN_AGE_SECONDS:-0}"
 ID="${PAIR_ID:-${REMOTE}-${BUCKET}}"
 RCLONE_CONF="${RCLONE_CONF:-/etc/rclone/rclone.conf}"
 LOG_DIR="${LOG_DIR:-/var/log/rclone}"
@@ -55,6 +64,8 @@ case "$MODE" in
   move|copy) ;;
   *) echo "RCLONE_MODE must be move or copy, got: $MODE" >&2; exit 2 ;;
 esac
+
+[[ "$MIN_AGE_SECONDS" =~ ^[0-9]+$ ]] || { echo "MIN_AGE_SECONDS must be a whole number of seconds, got: $MIN_AGE_SECONDS" >&2; exit 2; }
 
 mkdir -p "$LOG_DIR"
 
@@ -77,6 +88,22 @@ fi
 
 # Modified time from a "modtime|name" line.
 mtime_of() { printf '%s' "${1%%|*}"; }
+
+# Succeeds if the file is at least MIN_AGE_SECONDS old (always true when it is 0).
+# Logs once per waiting file, not on every poll.
+WAITING=""
+old_enough() {
+  [ "$MIN_AGE_SECONDS" -eq 0 ] && return 0
+  local ts age
+  ts=$(date -d "$(mtime_of "$1")" +%s) || return 1
+  age=$(( $(date +%s) - ts ))
+  if [ "$age" -ge "$MIN_AGE_SECONDS" ]; then WAITING=""; return 0; fi
+  if [ "${1#*|}" != "$WAITING" ]; then
+    WAITING="${1#*|}"
+    log "WAIT '${1#*|}' is ${age}s old; waiting for MIN_AGE_SECONDS=${MIN_AGE_SECONDS}"
+  fi
+  return 1
+}
 
 # Prints the next file as "modtime|name" (oldest first, skipping names already handled
 # in this cycle), or nothing when there is none. Non-zero if the listing fails.
@@ -127,6 +154,9 @@ run_once() {
     line=$(next_file) || return 1
     [ -z "$line" ] && return 0
     name="${line#*|}"
+
+    # Oldest file not old enough yet: all others are younger, so wait for the next cycle.
+    old_enough "$line" || return 0
 
     check_late "$line"
     log "START $name"

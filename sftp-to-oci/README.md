@@ -36,6 +36,19 @@ No credentials belong in this repository.
 - Timestamps have one-second precision. Files in the same second have no real order; they are processed in
   name order only to keep the result deterministic.
 
+## Minimum file age (optional, per pair)
+
+Set `MIN_AGE_SECONDS` in a pair's env file to transfer a file only once its modified time is at least
+that old. The default `0` transfers immediately, so it can differ per server and folder.
+
+- Files go oldest-first, so if the oldest file is too young every other file is younger still. The cycle
+  ends and the file is picked up in the first cycle after it reaches the age. Waiting never breaks order.
+- A file still being written keeps a fresh modified time, so this doubles as a "no writes in the last N
+  seconds" check.
+- A file moves between `MIN_AGE_SECONDS` and `MIN_AGE_SECONDS` plus the polling interval after it appears.
+- Age is measured against the VM clock. Keep the VM on NTP; if the SFTP server clock runs ahead, files
+  wait longer than intended.
+
 ## Add a new SFTP server
 
 1. Add a `[sftp-serverN]` block to `/etc/rclone/rclone.conf`.
@@ -48,7 +61,7 @@ No credentials belong in this repository.
 
 ## Status
 
-`tests/test_ordering.sh` (13 checks, stub rclone) covers oldest-first order, same-second tie-break, mid-run
-arrivals, late-file detection, failure and resume, copy mode and timestamp-over-name precedence. It has not been run
+`tests/test_ordering.sh` (21 checks, stub rclone) covers oldest-first order, same-second tie-break, mid-run
+arrivals, late-file detection, failure and resume, copy mode, timestamp-over-name precedence and the minimum-age wait. It has not been run
 against a real SFTP server or bucket. The SQL is sample code written without a database to test
 against: validate it in a non-production ATP before use.
