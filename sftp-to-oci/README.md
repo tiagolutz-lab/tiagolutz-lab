@@ -31,8 +31,8 @@ No credentials belong in this repository.
 - In move mode a high-water mark is kept in `/var/lib/sftp2oci`. A file that appears with an older
   timestamp than one already transferred is still transferred, and `ORDER_VIOLATION` is logged. Alert on
   that string.
-- SFTP stores no arrival time, so modified time is arrival order only if the sender sets it when the file
-  is written and does not preserve the source file's timestamp. Verify this with the sender.
+- The sender writes each file under its final name only when complete and does not preserve source
+  timestamps, so modified time reflects arrival.
 - Timestamps have one-second precision. Files in the same second have no real order; they are processed in
   name order only to keep the result deterministic.
 

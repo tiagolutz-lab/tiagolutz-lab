@@ -11,9 +11,8 @@
 #
 # Ordering
 #   * The order key is the file's modified time on the SFTP server. File names are NOT
-#     used for ordering. SFTP records no arrival time, so this equals arrival order only
-#     if the sender sets the time when the file is written and does not preserve the
-#     source file's original timestamp. Verify this with the sender.
+#     used for ordering. The sender writes each file under its final name only when it is
+#     complete and does not preserve source timestamps, so modified time reflects arrival.
 #   * SFTP timestamps have one-second precision. Files sharing the same second have no
 #     real order; they are processed in name order purely so the result is deterministic.
 #   * The folder is listed again before EVERY file, and the oldest remaining file is
