@@ -22,8 +22,11 @@ CREATE SEQUENCE ad_file_log_seq NOCACHE;
 -- belongs to exactly one job, so two jobs never work on the same bucket and the
 -- per-bucket order holds. Create the jobs in 03_scheduler_job.sql; a JOB_NAME with no
 -- matching job means the bucket is never processed.
+-- ARCHIVE_ON_SUCCESS = 'Y': a successfully loaded file is moved to ARCHIVE_URI.
+-- ARCHIVE_ON_SUCCESS = 'N': no archive; a successfully loaded file is simply deleted from
+-- the bucket, and ARCHIVE_URI can be left empty.
 -- ARCHIVE_URI / ERROR_URI are the shared buckets (full bucket URI, may include a prefix)
--- that a loaded file is moved to, or a file that keeps failing is moved to. They can be
+-- that a loaded file is archived to, or a file that keeps failing is moved to. They can be
 -- the same values on every row. Files are stored as
 --   <archive or error uri><source bucket name>/<yyyy-mm-dd of creation>/<file_id>_<object name>
 -- so integrations sharing a bucket never overwrite each other.
@@ -36,28 +39,31 @@ CREATE TABLE ad_bucket_config (
   job_name        VARCHAR2(128) DEFAULT 'AD_PERSIST_FILES_A' NOT NULL,
   priority        NUMBER        DEFAULT 100 NOT NULL,
   load_procedure  VARCHAR2(261) DEFAULT 'AD_FILE_PERSIST_PKG.LOAD_DEFAULT' NOT NULL,
-  archive_uri     VARCHAR2(500) NOT NULL,
+  archive_on_success VARCHAR2(1) DEFAULT 'Y' NOT NULL,
+  archive_uri     VARCHAR2(500),
   error_uri       VARCHAR2(500) NOT NULL,
   max_attempts    NUMBER        DEFAULT 3 NOT NULL,
   enabled         VARCHAR2(1)   DEFAULT 'Y' NOT NULL,
   CONSTRAINT ad_bucket_config_pk PRIMARY KEY (bucket_uri),
   CONSTRAINT ad_bucket_config_ck CHECK (enabled IN ('Y', 'N')),
-  CONSTRAINT ad_bucket_config_ck2 CHECK (max_attempts >= 1)
+  CONSTRAINT ad_bucket_config_ck2 CHECK (max_attempts >= 1),
+  CONSTRAINT ad_bucket_config_ck3 CHECK (archive_on_success IN ('Y', 'N')),
+  CONSTRAINT ad_bucket_config_ck4 CHECK (archive_on_success = 'N' OR archive_uri IS NOT NULL)
 );
 
 -- Sample rows are disabled so nothing runs until real values are entered.
 INSERT INTO ad_bucket_config (bucket_uri, description, job_name, priority, load_procedure,
-                              archive_uri, error_uri, max_attempts, enabled)
+                              archive_on_success, archive_uri, error_uri, max_attempts, enabled)
 VALUES ('https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket-a>/o/',
         'Sample: ad_*.xml files from SFTP server 1', 'AD_PERSIST_FILES_A', 10,
-        'AD_FILE_PERSIST_PKG.LOAD_DEFAULT',
+        'AD_FILE_PERSIST_PKG.LOAD_DEFAULT', 'Y',
         'https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<archive-bucket>/o/',
         'https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<error-bucket>/o/', 3, 'N');
 INSERT INTO ad_bucket_config (bucket_uri, description, job_name, priority, load_procedure,
-                              archive_uri, error_uri, max_attempts, enabled)
+                              archive_on_success, archive_uri, error_uri, max_attempts, enabled)
 VALUES ('https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket-b>/o/',
         'Sample: orders CSV files from SFTP server 2', 'AD_PERSIST_FILES_B', 10,
-        'AD_FILE_PERSIST_PKG.LOAD_DEFAULT',
+        'AD_FILE_PERSIST_PKG.LOAD_DEFAULT', 'Y',
         'https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<archive-bucket>/o/',
         'https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<error-bucket>/o/', 3, 'N');
 
@@ -78,7 +84,7 @@ CREATE TABLE ad_file_log (
 
 -- Every failed attempt (append-only). Alert on new rows or repeated failures.
 --   LOAD         the file failed to load (rolled back); counted against MAX_ATTEMPTS
---   MOVE         copying to the archive or error bucket, or the delete after it, failed
+--   MOVE         archiving or deleting a loaded file, or moving a file to the error bucket, failed
 --   QUARANTINED  the file was moved to the error bucket (ERROR_TEXT says where): the
 --                bucket then carried on, so the load order was deliberately broken
 CREATE TABLE ad_file_error (

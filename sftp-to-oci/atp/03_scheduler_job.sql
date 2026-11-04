@@ -13,16 +13,18 @@
 --
 -- Buckets are not named here. To add one:
 --   INSERT INTO ad_bucket_config (bucket_uri, description, job_name, priority, load_procedure,
---                                 archive_uri, error_uri, max_attempts)
+--                                 archive_on_success, archive_uri, error_uri, max_attempts)
 --   VALUES ('https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<bucket>/o/',
 --           'What the bucket holds and which interface it serves', 'AD_PERSIST_FILES_A', 10,
---           'AD_FILE_PERSIST_PKG.LOAD_DEFAULT',
+--           'AD_FILE_PERSIST_PKG.LOAD_DEFAULT', 'Y',
 --           'https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<archive-bucket>/o/',
 --           'https://objectstorage.<region>.oraclecloud.com/n/<namespace>/b/<error-bucket>/o/', 3);
 --   COMMIT;
 -- To move a bucket to another job:
 --   UPDATE ad_bucket_config SET job_name = 'AD_PERSIST_FILES_B' WHERE bucket_uri = '<bucket uri>';
 --   (takes effect on the job's next run; a run already in progress finishes its bucket first)
+-- To stop archiving a bucket (loaded files are then just deleted):
+--   UPDATE ad_bucket_config SET archive_on_success = 'N' WHERE bucket_uri = '<bucket uri>';
 -- To pause one: UPDATE ad_bucket_config SET enabled = 'N' WHERE bucket_uri = '<bucket uri>';
 -- To change the read order inside a job: UPDATE ad_bucket_config SET priority = <n> WHERE bucket_uri = '<bucket uri>';
 --   (lowest number is read first)

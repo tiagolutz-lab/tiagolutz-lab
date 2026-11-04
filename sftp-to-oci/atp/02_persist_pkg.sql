@@ -7,10 +7,11 @@
 -- Loading: each bucket names its own loader in AD_BUCKET_CONFIG.LOAD_PROCEDURE, called
 -- dynamically for every file. The default, LOAD_DEFAULT, loads by file extension.
 --
--- Success: after the file is loaded and committed it is MOVED (copied, then deleted from the
--- source) to the archive bucket. If the move fails, the file is already in AD_FILE_LOG so it
--- is never loaded twice; the move is retried at the start of every run for that bucket and
--- each failure is written to AD_FILE_ERROR (type MOVE).
+-- Success: after the file is loaded and committed it leaves the source bucket. With
+-- ARCHIVE_ON_SUCCESS = 'Y' it is MOVED (copied, then deleted) to the archive bucket; with 'N'
+-- it is just deleted. If that fails, the file is already in AD_FILE_LOG so it is never loaded
+-- twice; it is retried at the start of every run for that bucket and each failure is written
+-- to AD_FILE_ERROR (type MOVE).
 --
 -- Failure: the file's work is rolled back and a LOAD row is written to AD_FILE_ERROR. The same
 -- file is retried on the next runs. Once it has failed MAX_ATTEMPTS times it is MOVED to the
@@ -60,6 +61,7 @@ CREATE OR REPLACE PACKAGE ad_file_persist_pkg AS
   TYPE t_bucket IS RECORD (
     bucket_uri      VARCHAR2(500),
     load_procedure  VARCHAR2(261),
+    archive_on_success VARCHAR2(1),
     archive_uri     VARCHAR2(500),
     error_uri       VARCHAR2(500),
     max_attempts    NUMBER);
@@ -119,24 +121,29 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
     DBMS_CLOUD.DELETE_OBJECT(credential_name => c_cred, object_uri => p_source_uri);
   END move_object;
 
-  -- ---- Archive a loaded file ----------------------------------------------------
+  -- ---- Dispose of a loaded file: archive it, or just delete it --------------------
   -- Never raises: the file is already loaded and logged. A failure is recorded and the
-  -- move is retried on the next run (see archive_loaded).
-  PROCEDURE archive_one (p_b t_bucket, p_file_id NUMBER, p_object VARCHAR2,
+  -- step is retried on the next run (see dispose_loaded).
+  PROCEDURE dispose_one (p_b t_bucket, p_file_id NUMBER, p_object VARCHAR2,
                          p_created TIMESTAMP WITH TIME ZONE) IS
   BEGIN
-    move_object(p_b.bucket_uri || p_object,
-                target_uri(p_b.archive_uri, p_b.bucket_uri, p_file_id, p_object, p_created));
+    IF p_b.archive_on_success = 'Y' THEN
+      move_object(p_b.bucket_uri || p_object,
+                  target_uri(p_b.archive_uri, p_b.bucket_uri, p_file_id, p_object, p_created));
+    ELSE
+      DBMS_CLOUD.DELETE_OBJECT(credential_name => c_cred, object_uri => p_b.bucket_uri || p_object);
+    END IF;
   EXCEPTION
     WHEN OTHERS THEN
       log_failure(p_b.bucket_uri, p_object, p_created, 'MOVE',
-                  'ARCHIVE FAILED (file already loaded): ' || SQLERRM);
-  END archive_one;
+                  CASE p_b.archive_on_success WHEN 'Y' THEN 'ARCHIVE' ELSE 'DELETE' END
+                  || ' FAILED (file already loaded): ' || SQLERRM);
+  END dispose_one;
 
-  -- Retries archive moves that failed earlier: objects still in the bucket that are already
-  -- in AD_FILE_LOG. The creation time must match, so a new file re-sent under the same name
-  -- is never archived unloaded.
-  PROCEDURE archive_loaded (p_b t_bucket) IS
+  -- Retries disposals that failed earlier: objects still in the bucket that are already in
+  -- AD_FILE_LOG. The creation time must match, so a new file re-sent under the same name
+  -- is never archived or deleted unloaded.
+  PROCEDURE dispose_loaded (p_b t_bucket) IS
   BEGIN
     FOR o IN (SELECT l.object_name, l.created, f.file_id
               FROM   DBMS_CLOUD.LIST_OBJECTS(c_cred, p_b.bucket_uri) l
@@ -145,9 +152,9 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
                AND   f.object_name    = l.object_name
                AND   f.object_created = l.created)
     LOOP
-      archive_one(p_b, o.file_id, o.object_name, o.created);
+      dispose_one(p_b, o.file_id, o.object_name, o.created);
     END LOOP;
-  END archive_loaded;
+  END dispose_loaded;
 
   -- ---- CSV: stage, then filter on insert -------------------------------------
   PROCEDURE load_csv (p_uri VARCHAR2, p_file_id NUMBER, p_read OUT NUMBER, p_loaded OUT NUMBER) IS
@@ -269,7 +276,7 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
     VALUES (l_file_id, p_b.bucket_uri, l_name, l_created, l_read, l_loaded);
 
     COMMIT;   -- rows + log entry together
-    archive_one(p_b, l_file_id, l_name, l_created);   -- after the commit; a failure is non-fatal
+    dispose_one(p_b, l_file_id, l_name, l_created);   -- after the commit; a failure is non-fatal
     RETURN TRUE;
   EXCEPTION
     WHEN OTHERS THEN
@@ -309,7 +316,7 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
 
   PROCEDURE process_all (p_b IN t_bucket) IS
   BEGIN
-    archive_loaded(p_b);   -- retry any earlier failed archive moves first
+    dispose_loaded(p_b);   -- retry any earlier failed archive moves or deletes first
     WHILE process_next(p_b) LOOP
       NULL;
     END LOOP;
@@ -319,7 +326,7 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
   PROCEDURE process_all_buckets (p_job_name IN VARCHAR2) IS
     l_b t_bucket;
   BEGIN
-    FOR b IN (SELECT bucket_uri, load_procedure, archive_uri, error_uri, max_attempts
+    FOR b IN (SELECT bucket_uri, load_procedure, archive_on_success, archive_uri, error_uri, max_attempts
               FROM   ad_bucket_config
               WHERE  enabled = 'Y'
               AND    job_name = p_job_name
@@ -330,7 +337,8 @@ CREATE OR REPLACE PACKAGE BODY ad_file_persist_pkg AS
         -- appended to them.
         l_b.bucket_uri     := RTRIM(b.bucket_uri, '/') || '/';
         l_b.load_procedure := b.load_procedure;
-        l_b.archive_uri    := RTRIM(b.archive_uri, '/') || '/';
+        l_b.archive_on_success := b.archive_on_success;
+        l_b.archive_uri    := CASE WHEN b.archive_uri IS NOT NULL THEN RTRIM(b.archive_uri, '/') || '/' END;
         l_b.error_uri      := RTRIM(b.error_uri, '/') || '/';
         l_b.max_attempts   := b.max_attempts;
         process_all(l_b);
