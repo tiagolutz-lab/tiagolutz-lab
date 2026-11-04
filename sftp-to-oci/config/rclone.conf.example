@@ -1,0 +1,23 @@
+# /etc/rclone/rclone.conf  (mode 600, owned by the service user)
+# One SFTP remote per server. All values below are placeholders.
+
+[sftp-server1]
+type = sftp
+host = <host-1>
+user = <user-1>
+key_file = /home/rclone-svc/.ssh/server1_ed25519
+known_hosts_file = /home/rclone-svc/.ssh/known_hosts
+
+[sftp-server2]
+type = sftp
+host = <host-2>
+user = <user-2>
+key_file = /home/rclone-svc/.ssh/server2_ed25519
+known_hosts_file = /home/rclone-svc/.ssh/known_hosts
+
+[oci]
+type = oracleobjectstorage
+provider = instance_principal_auth
+namespace = <object-storage-namespace>
+compartment = <compartment-ocid>
+region = <region>

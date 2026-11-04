@@ -1,0 +1,20 @@
+Dynamic group (matches the one transfer VM):
+
+  ANY {instance.id = '<transfer-vm-ocid>'}
+
+Policy (replace the placeholders; add one target.bucket.name clause per bucket):
+
+  Allow dynamic-group <sftp-transfer-dg> to read buckets in compartment <compartment-name>
+    where any {target.bucket.name = '<bucket-a>', target.bucket.name = '<bucket-b>'}
+
+  Allow dynamic-group <sftp-transfer-dg> to manage objects in compartment <compartment-name>
+    where any {target.bucket.name = '<bucket-a>', target.bucket.name = '<bucket-b>'}
+
+If the buckets use a customer-managed key, also allow the dynamic group and the
+Object Storage service to use that key.
+
+For ATP reading the buckets (resource principal), add the Autonomous Database to a
+separate dynamic group and grant it read access to the same buckets:
+
+  Allow dynamic-group <atp-dg> to read objects in compartment <compartment-name>
+    where any {target.bucket.name = '<bucket-a>', target.bucket.name = '<bucket-b>'}

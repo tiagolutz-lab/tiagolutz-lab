@@ -1,0 +1,17 @@
+[Unit]
+Description=SFTP to OCI transfer (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=rclone-svc
+Environment=PAIR_ID=%i
+# Uncomment during the parallel-run phase (no deletes on SFTP):
+# Environment=RCLONE_MODE=copy
+EnvironmentFile=/etc/sftp2oci/%i.env
+ExecStart=/opt/sftp2oci/bin/transfer.sh ${REMOTE} ${SRC} ${PATTERN} ${BUCKET} ${INTERVAL}
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
