@@ -52,3 +52,43 @@ or policy can take up to two hours to take effect.
 
 Then run atp/00_connect_to_object_storage.sql on the database. Use one dynamic group per
 environment (test, production) so a test database cannot read production buckets.
+
+
+------------------------------------------------------------------------------------------
+Testing with one existing bucket: add write and delete to a database that already has read
+------------------------------------------------------------------------------------------
+The database already lists and reads through its dynamic group. To test uploads (PUT_OBJECT),
+copy and move (COPY_OBJECT then DELETE_OBJECT) and deleting files in ONE test bucket, add this
+statement. Policies are additive, so leave the existing read policy as it is. No new database
+grants are needed.
+
+Write the policy in the bucket's compartment or a parent of it, with the dynamic group that
+already has read access:
+
+  Allow dynamic-group <atp-dg> to manage objects in compartment <bucket-compartment>
+    where all {target.bucket.name = '<test-bucket>',
+               any {request.permission = 'OBJECT_INSPECT',
+                    request.permission = 'OBJECT_READ',
+                    request.permission = 'OBJECT_CREATE',
+                    request.permission = 'OBJECT_OVERWRITE',
+                    request.permission = 'OBJECT_DELETE'}}
+
+What each permission is for:
+  OBJECT_INSPECT    list objects
+  OBJECT_READ       read objects (already granted; included to keep the statement complete)
+  OBJECT_CREATE     upload (PUT_OBJECT) and the copy half of the archive move
+  OBJECT_OVERWRITE  retried uploads and copies that replace an existing object
+  OBJECT_DELETE     DELETE_OBJECT, the delete half of the move, delete-after-load
+
+Simpler form for a single test bucket (includes delete):
+
+  Allow dynamic-group <atp-dg> to manage objects in compartment <bucket-compartment>
+    where target.bucket.name = '<test-bucket>'
+
+With identity domains, write the group as <identity-domain>/<atp-dg>. Oracle caches the resource
+principal token for up to two hours, so the change may take that long to apply.
+
+To test: run atp/04_upload_csv_blob.sql against the test bucket and list the bucket. For the
+archive move, run DBMS_CLOUD.COPY_OBJECT then DELETE_OBJECT between two prefixes of the same
+bucket. The exact permissions COPY_OBJECT needs on source and target are not confirmed, so this
+test shows whether the statement above is enough.
