@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 780" width="1160" height="780" font-family="Helvetica, Arial, sans-serif">
+<rect width="1160" height="780" fill="#ffffff"/>
+<text x="580" y="34" text-anchor="middle" font-size="22" font-weight="bold" fill="#1f2937">Proposed OCI structure: compartments, buckets, access</text>
+<!-- tenancy -->
+<rect x="440" y="56" width="280" height="46" rx="8" fill="#e5e7eb" stroke="#6b7280" stroke-width="1.5"/>
+<text x="580" y="84" text-anchor="middle" font-size="15" font-weight="bold" fill="#111827">Tenancy (one namespace)</text>
+<line x1="580" y1="102" x2="580" y2="126" stroke="#6b7280" stroke-width="2"/>
+<line x1="290" y1="126" x2="870" y2="126" stroke="#6b7280" stroke-width="2"/>
+<line x1="290" y1="126" x2="290" y2="150" stroke="#6b7280" stroke-width="2"/>
+<line x1="870" y1="126" x2="870" y2="150" stroke="#6b7280" stroke-width="2"/>
+<!-- prod -->
+<rect x="40" y="150" width="500" height="470" rx="12" fill="#fef2f2" stroke="#b91c1c" stroke-width="2"/>
+<text x="290" y="182" text-anchor="middle" font-size="18" font-weight="bold" fill="#991b1b">integrations-prod</text>
+<text x="290" y="203" text-anchor="middle" font-size="13" fill="#7f1d1d">Production only. Least-privilege policy, named buckets.</text>
+<g font-size="14" fill="#111827">
+<rect x="70" y="225" width="440" height="40" rx="6" fill="#fff" stroke="#b91c1c"/><text x="86" y="250" font-family="monospace">bkt-lcn-prd-ifa</text><text x="500" y="250" text-anchor="end" fill="#6b7280" font-size="12">InterfaceA files</text>
+<rect x="70" y="275" width="440" height="40" rx="6" fill="#fff" stroke="#b91c1c"/><text x="86" y="300" font-family="monospace">bkt-lcn-prd-ifb</text><text x="500" y="300" text-anchor="end" fill="#6b7280" font-size="12">InterfaceB files</text>
+<rect x="70" y="325" width="440" height="40" rx="6" fill="#fff" stroke="#b91c1c"/><text x="86" y="350" font-family="monospace">bkt-lcn-prd-archive</text><text x="500" y="350" text-anchor="end" fill="#6b7280" font-size="12">shared, loaded OK</text>
+<rect x="70" y="375" width="440" height="40" rx="6" fill="#fff" stroke="#b91c1c"/><text x="86" y="400" font-family="monospace">bkt-lcn-prd-error</text><text x="500" y="400" text-anchor="end" fill="#6b7280" font-size="12">shared, failed files</text>
+</g>
+<rect x="70" y="440" width="440" height="150" rx="8" fill="#fff" stroke="#fca5a5" stroke-dasharray="5 4"/>
+<text x="86" y="464" font-size="13" font-weight="bold" fill="#991b1b">Access (production)</text>
+<text x="86" y="486" font-size="12.5" fill="#1f2937">atp-integrations-prod-dg  (prod ADB only)</text>
+<text x="86" y="506" font-size="12.5" fill="#1f2937">• ifa / ifb: list, read, delete</text>
+<text x="86" y="526" font-size="12.5" fill="#1f2937">• archive / error: list, create, overwrite</text>
+<text x="86" y="552" font-size="12.5" fill="#1f2937">Transfer VM group: write to ifa / ifb only</text>
+<text x="86" y="572" font-size="12.5" fill="#1f2937">Cannot reach any non-prod bucket.</text>
+<!-- nonprod -->
+<rect x="580" y="150" width="540" height="470" rx="12" fill="#eff6ff" stroke="#1d4ed8" stroke-width="2"/>
+<text x="850" y="182" text-anchor="middle" font-size="18" font-weight="bold" fill="#1e3a8a">integrations-nonprod</text>
+<text x="850" y="203" text-anchor="middle" font-size="13" fill="#1e3a8a">Parent of all non-prod environments. One policy covers every child.</text>
+<!-- children -->
+<rect x="605" y="222" width="150" height="34" rx="6" fill="#dbeafe" stroke="#1d4ed8"/><text x="680" y="244" text-anchor="middle" font-size="14" font-weight="bold" fill="#1e3a8a">dev</text>
+<rect x="765" y="222" width="150" height="34" rx="6" fill="#dbeafe" stroke="#1d4ed8"/><text x="840" y="244" text-anchor="middle" font-size="14" font-weight="bold" fill="#1e3a8a">uat</text>
+<rect x="925" y="222" width="170" height="34" rx="6" fill="#dbeafe" stroke="#1d4ed8"/><text x="1010" y="244" text-anchor="middle" font-size="14" fill="#1e3a8a">... 7 to 8 envs in total</text>
+<rect x="605" y="270" width="490" height="190" rx="10" fill="#fff" stroke="#1d4ed8" stroke-width="2"/>
+<text x="625" y="296" font-size="15" font-weight="bold" fill="#1e3a8a">sit  (child compartment, example)</text>
+<g font-size="14" fill="#111827">
+<rect x="625" y="310" width="450" height="30" rx="5" fill="#eff6ff" stroke="#93c5fd"/><text x="640" y="330" font-family="monospace">bkt-lcn-sit-ifa</text><text x="1065" y="330" text-anchor="end" fill="#6b7280" font-size="12">InterfaceA files</text>
+<rect x="625" y="346" width="450" height="30" rx="5" fill="#eff6ff" stroke="#93c5fd"/><text x="640" y="366" font-family="monospace">bkt-lcn-sit-ifb</text><text x="1065" y="366" text-anchor="end" fill="#6b7280" font-size="12">InterfaceB files</text>
+<rect x="625" y="382" width="450" height="30" rx="5" fill="#eff6ff" stroke="#93c5fd"/><text x="640" y="402" font-family="monospace">bkt-lcn-sit-archive</text><text x="1065" y="402" text-anchor="end" fill="#6b7280" font-size="12">shared, loaded OK</text>
+<rect x="625" y="418" width="450" height="30" rx="5" fill="#eff6ff" stroke="#93c5fd"/><text x="640" y="438" font-family="monospace">bkt-lcn-sit-error</text><text x="1065" y="438" text-anchor="end" fill="#6b7280" font-size="12">shared, failed files</text>
+</g>
+<text x="605" y="484" font-size="12.5" fill="#1e3a8a">Every other environment repeats the same four buckets:</text>
+<text x="605" y="503" font-size="12.5" font-family="monospace" fill="#1e3a8a">bkt-lcn-dev-ifa, bkt-lcn-uat-archive, ...</text>
+<rect x="605" y="520" width="490" height="80" rx="8" fill="#fff" stroke="#93c5fd" stroke-dasharray="5 4"/>
+<text x="620" y="542" font-size="13" font-weight="bold" fill="#1e3a8a">Access (non-prod)</text>
+<text x="620" y="562" font-size="12.5" fill="#1f2937">atp-integrations-nonprod-dg: manage objects on the parent,</text>
+<text x="620" y="581" font-size="12.5" fill="#1f2937">so every child env is covered. Copying between envs is fine.</text>
+<!-- test buckets -->
+<text x="850" y="450" text-anchor="middle" font-size="1" fill="#fff"> </text>
+<!-- legend / flow -->
+<rect x="40" y="640" width="1080" height="110" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+<text x="60" y="668" font-size="14" font-weight="bold" fill="#111827">File flow in each environment</text>
+<text x="60" y="694" font-size="13.5" fill="#1f2937">SFTP server  →  rclone VM  →  interface bucket (ifa / ifb)  →  ATP loads the file, one transaction per file</text>
+<text x="60" y="716" font-size="13.5" fill="#1f2937">Loaded OK  →  moved to the shared archive bucket (or deleted if archiving is off)   |   Keeps failing  →  moved to the shared error bucket</text>
+<text x="60" y="738" font-size="12.5" fill="#6b7280">Naming: bkt-lcn-&lt;env&gt;-&lt;interface&gt; (prd, sit, uat, dev; ifa = InterfaceA, ifb = InterfaceB), bkt-lcn-&lt;env&gt;-archive, bkt-lcn-&lt;env&gt;-error. Two extra test buckets sit in integrations-nonprod.</text>
+</svg>

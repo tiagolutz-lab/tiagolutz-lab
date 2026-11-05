@@ -9,8 +9,8 @@ We are building a pipeline that moves files from SFTP servers into OCI Object St
 
 ## 1. How the pipeline works
 
-1. A transfer VM (rclone) copies files from the SFTP servers into landing buckets, oldest file first. A file is deleted from the SFTP server only after the upload is verified.
-2. ATP lists the landing buckets and reads each file, oldest first, using a resource principal (no stored credentials).
+1. A transfer VM (rclone) copies files from the SFTP servers into the interface buckets, oldest file first. A file is deleted from the SFTP server only after the upload is verified.
+2. ATP lists the interface buckets and reads each file, oldest first, using a resource principal (no stored credentials).
 3. Each file is loaded in one database transaction.
 4. After a successful load, the file is moved to a shared ARCHIVE bucket, or deleted if archiving is switched off for that bucket.
 5. If a file keeps failing, it is moved to a shared ERROR bucket so it does not block the files behind it.
@@ -45,20 +45,21 @@ Please confirm the final names. If a different convention is already in use, we 
 
 ### 3.2 Buckets
 
+See the diagram: [compartment_bucket_structure.png](compartment_bucket_structure.png).
+
 Bucket names are unique within the namespace and region, and cannot be renamed. Proposed convention:
 
-`bkt-lcn-<env>-<interface>-<role>`
+`bkt-lcn-<env>-<interface>` for the buckets files arrive in, and `bkt-lcn-<env>-archive` / `bkt-lcn-<env>-error` for the shared ones
 
 - `<env>`: `prd`, `sit`, `uat`, `dev` and so on
 - `<interface>`: `ifa` for InterfaceA, `ifb` for InterfaceB
-- `<role>`: `landing`, `archive`, `error`
 
 Example for SIT (the same pattern repeats per environment):
 
 | Bucket | Compartment | Purpose |
 | --- | --- | --- |
-| `bkt-lcn-sit-ifa-landing` | `integrations-nonprod/sit` | InterfaceA files from SFTP |
-| `bkt-lcn-sit-ifb-landing` | `integrations-nonprod/sit` | InterfaceB files from SFTP |
+| `bkt-lcn-sit-ifa` | `integrations-nonprod/sit` | InterfaceA files from SFTP |
+| `bkt-lcn-sit-ifb` | `integrations-nonprod/sit` | InterfaceB files from SFTP |
 | `bkt-lcn-sit-archive` | `integrations-nonprod/sit` | Shared archive for SIT |
 | `bkt-lcn-sit-error` | `integrations-nonprod/sit` | Shared error bucket for SIT |
 
@@ -66,8 +67,8 @@ Production gets the same set in `integrations-prod` with `prd`:
 
 | Bucket | Compartment |
 | --- | --- |
-| `bkt-lcn-prd-ifa-landing` | `integrations-prod` |
-| `bkt-lcn-prd-ifb-landing` | `integrations-prod` |
+| `bkt-lcn-prd-ifa` | `integrations-prod` |
+| `bkt-lcn-prd-ifb` | `integrations-prod` |
 | `bkt-lcn-prd-archive` | `integrations-prod` |
 | `bkt-lcn-prd-error` | `integrations-prod` |
 
@@ -108,10 +109,10 @@ This lets ATP list, read, create, overwrite and delete objects in every non-prod
 **Production.** Least privilege, limited to the named buckets:
 
 ```
-Source (landing) buckets: list, read, delete
+Source (interface) buckets: list, read, delete
 Allow dynamic-group atp-integrations-prod-dg to manage objects in compartment integrations-prod
-  where all {any {target.bucket.name = 'bkt-lcn-prd-ifa-landing',
-                  target.bucket.name = 'bkt-lcn-prd-ifb-landing'},
+  where all {any {target.bucket.name = 'bkt-lcn-prd-ifa',
+                  target.bucket.name = 'bkt-lcn-prd-ifb'},
              any {request.permission = 'OBJECT_INSPECT',
                   request.permission = 'OBJECT_READ',
                   request.permission = 'OBJECT_DELETE'}}
@@ -129,7 +130,7 @@ Allow dynamic-group atp-integrations-prod-dg to read buckets in compartment inte
 
 The simpler alternative is `manage objects` on the same buckets. It is broader, but acceptable if you prefer it.
 
-**Transfer VM (rclone).** A separate dynamic group that matches the transfer VM instance, with `manage objects` and `read buckets` on the landing buckets only. The VM must not reach archive or error buckets.
+**Transfer VM (rclone).** A separate dynamic group that matches the transfer VM instance, with `manage objects` and `read buckets` on the interface buckets only. The VM must not reach archive or error buckets.
 
 **Scope option.** The statements above are scoped to a compartment. A policy can also be written at tenancy level, which covers every compartment and every bucket in the namespace. That is easier to maintain, but it gives the database access to everything, including production. Our recommendation is compartment level, as above. Please choose what fits your standards.
 
