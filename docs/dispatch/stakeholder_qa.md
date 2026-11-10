@@ -23,6 +23,15 @@ but does not interfere with the new message.
 
 Controlled by `AD_INT_DEPENDENCIES`. If Interface B is configured to depend on Interface A, B's messages
 are **held** (not discarded) — they remain QUEUED and are not promoted for dispatch while Interface A
-has messages in-flight or failed for the same `BUSINESS_IDENTIFIER1`. Once A reaches a terminal status,
-B becomes eligible on the next dispatcher cycle. If no dependency is configured, A and B are processed
+has **any** message in a non-terminal status (i.e. not `PROCESSED` or `ERROR`).
+
+This is **global blocking**: the dependency gate operates at the interface level, not per business key.
+If a single message for Interface A is still in-flight (QUEUED, RETRY, PROCESSING, or READY_TO_DISPATCH),
+the entire Interface B is blocked — regardless of which business keys are involved.
+
+This applies equally to ATP_INDIVIDUAL and both ATP_GROUP variants (Parallel and Serial) — all three
+SEQUENCE_MSGS MERGEs share the same `blocked_keys` CTE logic.
+
+Once **all** Interface A messages for the dependent stage reach `PROCESSED` or `ERROR`, Interface B
+becomes eligible on the next dispatcher cycle. If no dependency is configured, A and B are processed
 independently.
